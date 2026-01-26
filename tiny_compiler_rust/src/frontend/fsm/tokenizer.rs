@@ -212,6 +212,9 @@ impl Tokenizer {
                 };
                 i += 1;
                 continue;
+            } else if cur_str == "<" && self.input[i] == '-' {
+                cur_token += &self.input[i].to_string();
+                self.is_symbol(cur_token.as_str());
             } else if self.is_ch_symbol(self.input[i])
                 && !cur_str.is_empty()
                 && (self.is_op(cur_str)
@@ -256,7 +259,7 @@ mod tests {
 
     #[test]
     fn test1() {
-        let input = String::from("1 + (var3) ; let v");
+        let input = String::from("1 <- + (var3) ; let v");
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
         tokenizer.get_token();
