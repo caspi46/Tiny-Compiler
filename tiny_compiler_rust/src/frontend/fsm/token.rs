@@ -22,6 +22,7 @@ pub enum Token {
     Op(Op),
     // Symbol
     Symbol(Symbol),
+    PreDefFunc(PreDefFunc),
 }
 
 impl fmt::Display for Token {
@@ -45,6 +46,7 @@ impl fmt::Display for Token {
             Token::Op(n) => write!(f, "Op({})", n),
             Token::Symbol(n) => write!(f, "Symbol({})", n),
             Token::Function(n) => write!(f, "Function({})", n),
+            Token::PreDefFunc(n) => write!(f, "Predefined Function({})", n),
         }
     }
 }
@@ -118,8 +120,19 @@ impl fmt::Display for Symbol {
     }
 }
 
-// Phi Function..?
-enum Phi {
-    x,
-    y,
+#[derive(Clone, Debug)]
+pub enum PreDefFunc {
+    InputNum(String),
+    OutputNum(String),
+    OutputNewLine(String),
+}
+
+impl fmt::Display for PreDefFunc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PreDefFunc::InputNum(s) => write!(f, "InputNum({})", s),
+            PreDefFunc::OutputNum(s) => write!(f, "OutputNum({})", s),
+            PreDefFunc::OutputNewLine(s) => write!(f, "OutputNewLine({})", s),
+        }
+    }
 }

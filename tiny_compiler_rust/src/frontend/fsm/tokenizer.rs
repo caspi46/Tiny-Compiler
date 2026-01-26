@@ -1,4 +1,4 @@
-use crate::frontend::fsm::token::{Op, RelOp, Symbol, Token};
+use crate::frontend::fsm::token::{Op, PreDefFunc, RelOp, Symbol, Token};
 
 pub struct Tokenizer {
     input: Vec<char>,
@@ -179,9 +179,33 @@ impl Tokenizer {
         }
     }
 
-    fn is_predefined_funcs(&mut self, cur_token: String) -> bool {
-        cur_token == "InputNum()" || cur_token == "OutputNewLinet()" // skip OutputNum(x) for now
+    fn is_predefined_func(&mut self, cur_token: &str) -> bool {
+        println!("Hello, this is predefined function checker");
+        match cur_token {
+            "InputNum" => self
+                .tokens
+                .push(Token::PreDefFunc(PreDefFunc::InputNum(String::from(
+                    "InputNum",
+                )))),
+            "OutputNum" => {
+                self.tokens
+                    .push(Token::PreDefFunc(PreDefFunc::OutputNum(String::from(
+                        "OutputNum",
+                    ))))
+            }
+            "OutputNewLine" => self
+                .tokens
+                .push(Token::PreDefFunc(PreDefFunc::OutputNewLine(String::from(
+                    "OutputNewLine",
+                )))),
+            _ => return false,
+        }
+        true
     }
+
+    // fn is_predefined_funcs(&mut self, cur_token: String) -> bool {
+    //     cur_token == "InputNum()" || cur_token == "OutputNewLinet()" // skip OutputNum(x) for now
+    // }
 
     fn is_ch_symbol(&self, ch: char) -> bool {
         ch == '+'
@@ -195,6 +219,7 @@ impl Tokenizer {
             || ch == ' '
             || ch == ';'
     }
+
     fn generate_token(&mut self) {
         let mut cur_token = match self.input[0] {
             ' ' => String::new(),
@@ -222,6 +247,7 @@ impl Tokenizer {
                     || self.is_reserved(cur_str)
                     || self.is_symbol(cur_str)
                     || self.is_number(cur_str)
+                    || self.is_predefined_func(cur_str)
                     || self.is_ident(cur_str))
             {
                 cur_token = if self.input[i] != ' ' {
@@ -238,12 +264,14 @@ impl Tokenizer {
             i += 1;
         }
         let cur_str = cur_token.as_str();
-        if self.is_op(cur_str)
-            || self.is_rel_op(cur_str)
-            || self.is_reserved(cur_str)
-            || self.is_symbol(cur_str)
-            || self.is_number(cur_str)
-            || self.is_ident(cur_str)
+        if !cur_str.is_empty()
+            && (self.is_op(cur_str)
+                || self.is_rel_op(cur_str)
+                || self.is_reserved(cur_str)
+                || self.is_symbol(cur_str)
+                || self.is_number(cur_str)
+                || self.is_predefined_func(cur_str)
+                || self.is_ident(cur_str))
         {}
         println!("Current token at the end: {}", cur_token);
     }
@@ -259,7 +287,7 @@ mod tests {
 
     #[test]
     fn test1() {
-        let input = String::from("1 <- + (var3) ; let v");
+        let input = String::from("1 <- + (var3) ; let v InputNum");
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
         tokenizer.get_token();
