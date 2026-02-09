@@ -185,9 +185,21 @@ impl Tokenizer {
             || ch == ' '
             || ch == '\n'
             || ch == ','
+            || ch == '<'
+            || ch == '>'
     }
     fn is_skippable(&self, ch: char) -> bool {
         ch == ' ' || ch == '\n'
+    }
+
+    fn check_token(&mut self, token: &str) -> bool {
+        self.is_op(token)
+            || self.is_rel_op(token)
+            || self.is_reserved(token)
+            || self.is_symbol(token)
+            || self.is_number(token)
+            || self.is_predefined_func(token)
+            || self.is_ident(token)
     }
 
     fn generate_token(&mut self) {
@@ -201,44 +213,30 @@ impl Tokenizer {
             let cur_str = cur_token.as_str();
             println!("current token: {}", cur_token);
             println!("current input element: {}", self.input[i]);
+            let mut next = "".to_string();
+            // check the symbol
             if !self.is_ch_symbol(self.input[i]) && self.is_symbol(cur_str) {
-                cur_token = if !self.is_skippable(self.input[i]) {
-                    String::from(self.input[i])
-                } else {
-                    String::new()
-                };
-                i += 1;
-                continue;
+                next = self.input[i].to_string();
             } else if cur_str == "<" && self.input[i] == '-' {
+                // check <-
                 println!("<- Checked!");
                 cur_token += &self.input[i].to_string();
                 self.is_symbol(cur_token.as_str());
-                i += 1;
             } else if self.is_ch_symbol(self.input[i]) && !cur_str.is_empty() {
-                let success = self.is_op(cur_str)
-                    || self.is_rel_op(cur_str)
-                    || self.is_reserved(cur_str)
-                    || self.is_symbol(cur_str)
-                    || self.is_number(cur_str)
-                    || self.is_predefined_func(cur_str)
-                    || self.is_ident(cur_str);
+                // check the current input is symbol => the token ends
+                let success = self.check_token(cur_str);
                 if !success {
-                    println!("Failed to add new token");
+                    panic!("Failed to add new token");
                 }
-                cur_token = if !self.is_skippable(self.input[i]) {
-                    self.input[i].to_string()
-                } else {
-                    String::from("")
-                };
+                next = self.input[i].to_string();
                 println!("current token after last if statement: \"{}\"", cur_token);
-                i += 1;
-                continue;
-            }
-
-            cur_token = if !self.is_skippable(self.input[i]) {
-                cur_token + &self.input[i].to_string()
             } else {
-                String::from("")
+                next = cur_token + &self.input[i].to_string();
+            }
+            cur_token = if !self.is_skippable(self.input[i]) {
+                next
+            } else {
+                "".to_string()
             };
             i += 1;
 
@@ -251,15 +249,9 @@ impl Tokenizer {
         }
         let cur_str = cur_token.as_str();
         if !cur_str.is_empty() {
-            let success = self.is_op(cur_str)
-                || self.is_rel_op(cur_str)
-                || self.is_reserved(cur_str)
-                || self.is_symbol(cur_str)
-                || self.is_number(cur_str)
-                || self.is_predefined_func(cur_str)
-                || self.is_ident(cur_str);
+            let success = self.check_token(cur_str);
             if !success {
-                println!("Failed to add new token");
+                panic!("Failed to add new token");
             }
         }
         println!("Current token at the end: {}", cur_token);
@@ -288,6 +280,14 @@ mod tests {
             call OutputNum(a)
     }.",
         );
+        let mut tokenizer = Tokenizer::new(input);
+        tokenizer.generate_token();
+        tokenizer.get_token();
+    }
+
+    #[test]
+    fn test2() {
+        let input = String::from("a<-b");
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
         tokenizer.get_token();
