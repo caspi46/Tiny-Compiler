@@ -60,13 +60,13 @@ impl Tokenizer {
 
     fn is_op(&mut self, cur_token: &str) -> bool {
         match cur_token {
-            "+" => self.tokens.push(Token::Op(Op::ADD(String::from("+")))),
+            "+" => self.tokens.push(Token::Op(Op::ADD)),
 
-            "-" => self.tokens.push(Token::Op(Op::SUB(String::from("-")))),
+            "-" => self.tokens.push(Token::Op(Op::SUB)),
 
-            "*" => self.tokens.push(Token::Op(Op::MUL(String::from("*")))),
+            "*" => self.tokens.push(Token::Op(Op::MUL)),
 
-            "/" => self.tokens.push(Token::Op(Op::DIV(String::from("/")))),
+            "/" => self.tokens.push(Token::Op(Op::DIV)),
 
             _ => {
                 println!("Not op");
@@ -79,37 +79,21 @@ impl Tokenizer {
     fn is_symbol(&mut self, cur_token: &str) -> bool {
         println!("We're in Symbol section: {}", cur_token);
         match cur_token {
-            "(" => self
-                .tokens
-                .push(Token::Symbol(Symbol::OpenParen(String::from("(")))),
+            "(" => self.tokens.push(Token::Symbol(Symbol::OpenParen)),
 
-            ")" => self
-                .tokens
-                .push(Token::Symbol(Symbol::CloseParen(String::from(")")))),
+            ")" => self.tokens.push(Token::Symbol(Symbol::CloseParen)),
 
-            "{" => self
-                .tokens
-                .push(Token::Symbol(Symbol::OpenBrace(String::from("{")))),
+            "{" => self.tokens.push(Token::Symbol(Symbol::OpenBrace)),
 
-            "}" => self
-                .tokens
-                .push(Token::Symbol(Symbol::CloseBrace(String::from("}")))),
+            "}" => self.tokens.push(Token::Symbol(Symbol::CloseBrace)),
 
-            "<-" => self
-                .tokens
-                .push(Token::Symbol(Symbol::Init(String::from("<-")))),
+            "<-" => self.tokens.push(Token::Symbol(Symbol::Init)),
 
-            ";" => self
-                .tokens
-                .push(Token::Symbol(Symbol::SemiColon(String::from(";")))),
+            ";" => self.tokens.push(Token::Symbol(Symbol::SemiColon)),
 
-            "." => self
-                .tokens
-                .push(Token::Symbol(Symbol::Period(String::from(".")))),
+            "." => self.tokens.push(Token::Symbol(Symbol::Period)),
 
-            "," => self
-                .tokens
-                .push(Token::Symbol(Symbol::Comma(String::from(",")))),
+            "," => self.tokens.push(Token::Symbol(Symbol::Comma)),
 
             _ => {
                 println!("Not Symbol");
@@ -121,31 +105,31 @@ impl Tokenizer {
 
     fn is_reserved(&mut self, cur_token: &str) -> bool {
         match cur_token {
-            "let" => self.tokens.push(Token::Let(String::from("let"))),
+            "let" => self.tokens.push(Token::Let),
 
-            "if" => self.tokens.push(Token::If(String::from("if"))),
+            "if" => self.tokens.push(Token::If),
 
-            "then" => self.tokens.push(Token::Then(String::from("then"))),
+            "then" => self.tokens.push(Token::Then),
 
-            "else" => self.tokens.push(Token::Else(String::from("else"))),
+            "else" => self.tokens.push(Token::Else),
 
-            "fi" => self.tokens.push(Token::Fi(String::from("fi"))),
+            "fi" => self.tokens.push(Token::Fi),
 
-            "while" => self.tokens.push(Token::While(String::from("while"))),
+            "while" => self.tokens.push(Token::While),
 
-            "do" => self.tokens.push(Token::Do(String::from("do"))),
+            "do" => self.tokens.push(Token::Do),
 
-            "od" => self.tokens.push(Token::Od(String::from("od"))),
+            "od" => self.tokens.push(Token::Od),
 
-            "return" => self.tokens.push(Token::Return(String::from("return"))),
+            "return" => self.tokens.push(Token::Return),
 
-            "var" => self.tokens.push(Token::Var(String::from("var"))),
+            "var" => self.tokens.push(Token::Var),
 
-            "void" => self.tokens.push(Token::Void(String::from("void"))),
+            "void" => self.tokens.push(Token::Void),
 
-            "function" => self.tokens.push(Token::Function(String::from("function"))),
+            "function" => self.tokens.push(Token::Function),
 
-            "main" => self.tokens.push(Token::Main(String::from("main"))),
+            "main" => self.tokens.push(Token::Main),
 
             _ => {
                 println!("Not reserved");
