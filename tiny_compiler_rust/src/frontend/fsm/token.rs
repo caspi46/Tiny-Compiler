@@ -53,23 +53,23 @@ impl fmt::Display for Token {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum RelOp {
-    EQ(String), // ==
-    NE(String), // !=
-    GT(String), // >
-    LT(String), // <
-    GE(String), // >=
-    LE(String), // <=
+    EQ, // ==
+    NE, // !=
+    GT, // >
+    LT, // <
+    GE, // >=
+    LE, // <=
 }
 
 impl fmt::Display for RelOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RelOp::EQ(o) => write!(f, "EQ({})", o),
-            RelOp::NE(o) => write!(f, "NE({})", o),
-            RelOp::GT(o) => write!(f, "GT({})", o),
-            RelOp::LT(o) => write!(f, "LT({})", o),
-            RelOp::GE(o) => write!(f, "GE({})", o),
-            RelOp::LE(o) => write!(f, "LE({})", o),
+            RelOp::EQ => write!(f, "EQ"),
+            RelOp::NE => write!(f, "NE"),
+            RelOp::GT => write!(f, "GT"),
+            RelOp::LT => write!(f, "LT"),
+            RelOp::GE => write!(f, "GE"),
+            RelOp::LE => write!(f, "LE"),
         }
     }
 }
@@ -122,17 +122,17 @@ impl fmt::Display for Symbol {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum PreDefFunc {
-    InputNum(String),
-    OutputNum(String),
-    OutputNewLine(String),
+    InputNum,
+    OutputNum,
+    OutputNewLine,
 }
 
 impl fmt::Display for PreDefFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PreDefFunc::InputNum(s) => write!(f, "InputNum({})", s),
-            PreDefFunc::OutputNum(s) => write!(f, "OutputNum({})", s),
-            PreDefFunc::OutputNewLine(s) => write!(f, "OutputNewLine({})", s),
+            PreDefFunc::InputNum => write!(f, "InputNum"),
+            PreDefFunc::OutputNum => write!(f, "OutputNum"),
+            PreDefFunc::OutputNewLine => write!(f, "OutputNewLine"),
         }
     }
 }

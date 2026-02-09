@@ -30,25 +30,17 @@ impl Tokenizer {
     // NOTE: should be careful when I handle <- and <
     fn is_rel_op(&mut self, cur_token: &str) -> bool {
         match cur_token {
-            "==" => self
-                .tokens
-                .push(Token::RelOp(RelOp::EQ(String::from("==")))),
+            "==" => self.tokens.push(Token::RelOp(RelOp::EQ)),
 
-            "!=" => self
-                .tokens
-                .push(Token::RelOp(RelOp::NE(String::from("!=")))),
+            "!=" => self.tokens.push(Token::RelOp(RelOp::NE)),
 
-            ">" => self.tokens.push(Token::RelOp(RelOp::GT(String::from(">")))),
+            ">" => self.tokens.push(Token::RelOp(RelOp::GT)),
 
-            "<" => self.tokens.push(Token::RelOp(RelOp::LT(String::from("<")))),
+            "<" => self.tokens.push(Token::RelOp(RelOp::LT)),
 
-            ">=" => self
-                .tokens
-                .push(Token::RelOp(RelOp::GE(String::from(">=")))),
+            ">=" => self.tokens.push(Token::RelOp(RelOp::GE)),
 
-            "<=" => self
-                .tokens
-                .push(Token::RelOp(RelOp::LE(String::from("<=")))),
+            "<=" => self.tokens.push(Token::RelOp(RelOp::LE)),
 
             _ => {
                 println!("Not relOp");
@@ -166,22 +158,11 @@ impl Tokenizer {
     fn is_predefined_func(&mut self, cur_token: &str) -> bool {
         println!("Hello, this is predefined function checker");
         match cur_token {
-            "InputNum" => self
-                .tokens
-                .push(Token::PreDefFunc(PreDefFunc::InputNum(String::from(
-                    "InputNum",
-                )))),
-            "OutputNum" => {
-                self.tokens
-                    .push(Token::PreDefFunc(PreDefFunc::OutputNum(String::from(
-                        "OutputNum",
-                    ))))
-            }
+            "InputNum" => self.tokens.push(Token::PreDefFunc(PreDefFunc::InputNum)),
+            "OutputNum" => self.tokens.push(Token::PreDefFunc(PreDefFunc::OutputNum)),
             "OutputNewLine" => self
                 .tokens
-                .push(Token::PreDefFunc(PreDefFunc::OutputNewLine(String::from(
-                    "OutputNewLine",
-                )))),
+                .push(Token::PreDefFunc(PreDefFunc::OutputNewLine)),
             _ => return false,
         }
         true
@@ -200,8 +181,13 @@ impl Tokenizer {
             || ch == ')'
             || ch == '{'
             || ch == '}'
-            || ch == ' '
             || ch == ';'
+            || ch == ' '
+            || ch == '\n'
+            || ch == ','
+    }
+    fn is_skippable(&self, ch: char) -> bool {
+        ch == ' ' || ch == '\n'
     }
 
     fn generate_token(&mut self) {
@@ -213,8 +199,10 @@ impl Tokenizer {
         while i < self.input.len() {
             println!("Enter the while loop");
             let cur_str = cur_token.as_str();
+            println!("current token: {}", cur_token);
+            println!("current input element: {}", self.input[i]);
             if !self.is_ch_symbol(self.input[i]) && self.is_symbol(cur_str) {
-                cur_token = if self.input[i] != ' ' {
+                cur_token = if !self.is_skippable(self.input[i]) {
                     String::from(self.input[i])
                 } else {
                     String::new()
@@ -222,41 +210,58 @@ impl Tokenizer {
                 i += 1;
                 continue;
             } else if cur_str == "<" && self.input[i] == '-' {
+                println!("<- Checked!");
                 cur_token += &self.input[i].to_string();
                 self.is_symbol(cur_token.as_str());
-            } else if self.is_ch_symbol(self.input[i])
-                && !cur_str.is_empty()
-                && (self.is_op(cur_str)
+                i += 1;
+            } else if self.is_ch_symbol(self.input[i]) && !cur_str.is_empty() {
+                let success = self.is_op(cur_str)
                     || self.is_rel_op(cur_str)
                     || self.is_reserved(cur_str)
                     || self.is_symbol(cur_str)
                     || self.is_number(cur_str)
                     || self.is_predefined_func(cur_str)
-                    || self.is_ident(cur_str))
-            {
-                cur_token = if self.input[i] != ' ' {
-                    String::from(self.input[i])
+                    || self.is_ident(cur_str);
+                if !success {
+                    println!("Failed to add new token");
+                }
+                cur_token = if !self.is_skippable(self.input[i]) {
+                    self.input[i].to_string()
                 } else {
-                    String::new()
+                    String::from("")
                 };
+                println!("current token after last if statement: \"{}\"", cur_token);
                 i += 1;
                 continue;
             }
-            if self.input[i] != ' ' {
-                cur_token += &self.input[i].to_string();
-            }
+
+            cur_token = if !self.is_skippable(self.input[i]) {
+                cur_token + &self.input[i].to_string()
+            } else {
+                String::from("")
+            };
             i += 1;
+
+            // cur_token = if self.input[i] != ' ' {
+            //     cur_token + &self.input[i].to_string()
+            // } else {
+            //     self.input[i].to_string()
+            // };
+            // i += 1;
         }
         let cur_str = cur_token.as_str();
-        if !cur_str.is_empty()
-            && (self.is_op(cur_str)
+        if !cur_str.is_empty() {
+            let success = self.is_op(cur_str)
                 || self.is_rel_op(cur_str)
                 || self.is_reserved(cur_str)
                 || self.is_symbol(cur_str)
                 || self.is_number(cur_str)
                 || self.is_predefined_func(cur_str)
-                || self.is_ident(cur_str))
-        {}
+                || self.is_ident(cur_str);
+            if !success {
+                println!("Failed to add new token");
+            }
+        }
         println!("Current token at the end: {}", cur_token);
     }
 
@@ -271,7 +276,18 @@ mod tests {
 
     #[test]
     fn test1() {
-        let input = String::from("1 <- + (var3) ; let v InputNum");
+        let input = String::from(
+            "main
+        var a, b, c, d, e; {
+            let a <- call InputNum(); 
+            let b <- a; 
+            let c <- b; 
+            let d <- b + c; 
+            let e <- a + b; 
+            if a < 0 then let d <- d + e; let a <- d else let d <- e fi; 
+            call OutputNum(a)
+    }.",
+        );
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
         tokenizer.get_token();
