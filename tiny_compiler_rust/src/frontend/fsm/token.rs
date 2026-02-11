@@ -1,9 +1,10 @@
 use std::fmt;
 // Tokens
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub enum Token {
     Number(String),
     Ident(String), // variable name
+    Call,
     Let,
     If,
     Then,
@@ -30,6 +31,7 @@ impl fmt::Display for Token {
         match self {
             Token::Number(n) => write!(f, "Number({})", n),
             Token::Ident(n) => write!(f, "Identifier({}", n),
+            Token::Call => write!(f, "Call"),
             Token::Let => write!(f, "Let"),
             Token::If => write!(f, "If"),
             Token::Then => write!(f, "Then"),
@@ -51,7 +53,7 @@ impl fmt::Display for Token {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum RelOp {
     EQ, // ==
     NE, // !=
@@ -74,7 +76,7 @@ impl fmt::Display for RelOp {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub enum Op {
     ADD, // +
     SUB, // -
@@ -93,7 +95,7 @@ impl fmt::Display for Op {
     }
 }
 // Symbol
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub enum Symbol {
     OpenParen,  // (
     CloseParen, // )
@@ -120,7 +122,7 @@ impl fmt::Display for Symbol {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub enum PreDefFunc {
     InputNum,
     OutputNum,

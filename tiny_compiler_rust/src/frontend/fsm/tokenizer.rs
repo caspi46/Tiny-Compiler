@@ -6,7 +6,7 @@ pub struct Tokenizer {
 }
 
 impl Tokenizer {
-    fn new(input: String) -> Self {
+    pub fn new(input: String) -> Self {
         if input.len() == 0 {
             panic!("Error from Tokenizer: empty input");
         }
@@ -97,6 +97,8 @@ impl Tokenizer {
 
     fn is_reserved(&mut self, cur_token: &str) -> bool {
         match cur_token {
+            "call" => self.tokens.push(Token::Call),
+
             "let" => self.tokens.push(Token::Let),
 
             "if" => self.tokens.push(Token::If),
@@ -202,7 +204,7 @@ impl Tokenizer {
             || self.is_ident(token)
     }
 
-    fn generate_token(&mut self) {
+    pub fn generate_token(&mut self) {
         let mut cur_token = match self.input[0] {
             ' ' => String::new(),
             n => String::from(n),
@@ -257,8 +259,9 @@ impl Tokenizer {
         println!("Current token at the end: {}", cur_token);
     }
 
-    fn get_token(&self) {
+    pub fn get_tokens(self) -> Vec<Token> {
         println!("Tokens: {:?}", self.tokens);
+        self.tokens
     }
 }
 
@@ -282,7 +285,7 @@ mod tests {
         );
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
-        tokenizer.get_token();
+        tokenizer.get_tokens();
     }
 
     #[test]
@@ -290,6 +293,6 @@ mod tests {
         let input = String::from("a<-b");
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
-        tokenizer.get_token();
+        tokenizer.get_tokens();
     }
 }

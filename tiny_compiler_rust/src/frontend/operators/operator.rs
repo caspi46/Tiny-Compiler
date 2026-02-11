@@ -19,6 +19,9 @@ pub enum Operator {
     Ble(String, String),
     Bge(String, String),
     Bgt(String, String),
+    Beq(String, String),
+    Blt(String, String),
+
     // Read & Write
     Read,
     Write(String),
