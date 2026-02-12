@@ -3,7 +3,7 @@ use std::fmt;
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub enum Token {
     Number(String),
-    Ident(String), // variable name
+    Ident(Ident), // variable name (predefined, user-defined)
     Call,
     Let,
     If,
@@ -23,7 +23,6 @@ pub enum Token {
     Op(Op),
     // Symbol
     Symbol(Symbol),
-    PreDefFunc(PreDefFunc),
 }
 
 impl fmt::Display for Token {
@@ -48,7 +47,6 @@ impl fmt::Display for Token {
             Token::Op(n) => write!(f, "Op({})", n),
             Token::Symbol(n) => write!(f, "Symbol({})", n),
             Token::Function => write!(f, "Function"),
-            Token::PreDefFunc(n) => write!(f, "Predefined Function({})", n),
         }
     }
 }
@@ -123,18 +121,20 @@ impl fmt::Display for Symbol {
 }
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
-pub enum PreDefFunc {
+pub enum Ident {
     InputNum,
     OutputNum,
     OutputNewLine,
+    UserDefined(String),
 }
 
-impl fmt::Display for PreDefFunc {
+impl fmt::Display for Ident {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PreDefFunc::InputNum => write!(f, "InputNum"),
-            PreDefFunc::OutputNum => write!(f, "OutputNum"),
-            PreDefFunc::OutputNewLine => write!(f, "OutputNewLine"),
+            Ident::InputNum => write!(f, "InputNum"),
+            Ident::OutputNum => write!(f, "OutputNum"),
+            Ident::OutputNewLine => write!(f, "OutputNewLine"),
+            Ident::UserDefined(s) => write!(f, "UserDfined {}", s),
         }
     }
 }

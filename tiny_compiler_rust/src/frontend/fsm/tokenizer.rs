@@ -1,4 +1,4 @@
-use crate::frontend::fsm::token::{Op, PreDefFunc, RelOp, Symbol, Token};
+use crate::frontend::fsm::token::{Ident, Ident::UserDefined, Op, RelOp, Symbol, Token};
 
 pub struct Tokenizer {
     input: Vec<char>,
@@ -150,7 +150,8 @@ impl Tokenizer {
                 if c.is_digit(10) {
                     panic!("No digit for first letter of variable");
                 }
-                self.tokens.push(Token::Ident(String::from(cur_token)));
+                self.tokens
+                    .push(Token::Ident(Ident::UserDefined(String::from(cur_token))));
                 return true;
             }
             None => panic!("Error in is_ident"),
@@ -160,11 +161,9 @@ impl Tokenizer {
     fn is_predefined_func(&mut self, cur_token: &str) -> bool {
         println!("Hello, this is predefined function checker");
         match cur_token {
-            "InputNum" => self.tokens.push(Token::PreDefFunc(PreDefFunc::InputNum)),
-            "OutputNum" => self.tokens.push(Token::PreDefFunc(PreDefFunc::OutputNum)),
-            "OutputNewLine" => self
-                .tokens
-                .push(Token::PreDefFunc(PreDefFunc::OutputNewLine)),
+            "InputNum" => self.tokens.push(Token::Ident(Ident::InputNum)),
+            "OutputNum" => self.tokens.push(Token::Ident(Ident::OutputNum)),
+            "OutputNewLine" => self.tokens.push(Token::Ident(Ident::OutputNewLine)),
             _ => return false,
         }
         true
