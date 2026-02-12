@@ -1,5 +1,5 @@
 // Operators
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Hash, Eq)]
 pub enum Operator {
     //Constant
     Const(String),

@@ -93,7 +93,7 @@ impl fmt::Display for Op {
     }
 }
 // Symbol
-#[derive(Clone, Debug, PartialEq, Hash, Eq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq, Copy)]
 pub enum Symbol {
     OpenParen,  // (
     CloseParen, // )

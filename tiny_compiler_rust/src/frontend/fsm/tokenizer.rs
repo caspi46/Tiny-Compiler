@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn test2() {
-        let input = String::from("a<-b");
+        let input = String::from("a<-b 1234");
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
         tokenizer.get_tokens();

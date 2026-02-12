@@ -2,7 +2,7 @@ use crate::frontend::operators::operator::Operator;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub struct Inst {
     data: (i32, Operator),
 }
@@ -27,5 +27,15 @@ impl<'a> Inst {
 
     pub fn update_operator(&mut self, operator: Operator) {
         self.data = (self.data.0, operator);
+    }
+
+    pub fn get_operator(self) -> Operator {
+        self.data.1
+    }
+    pub fn get_inst_num(self) -> i32 {
+        self.data.0
+    }
+    pub fn get_data(self) -> (i32, Operator) {
+        self.data
     }
 }
