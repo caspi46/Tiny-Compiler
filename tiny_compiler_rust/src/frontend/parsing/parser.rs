@@ -1,36 +1,46 @@
 use crate::frontend::fsm::{
     token::{
-        Op::ADD, Op::DIV, Op::MUL, Op::SUB, RelOp::EQ, RelOp::GE, RelOp::GT, RelOp::LE, RelOp::LT,
-        RelOp::NE, Symbol, Token, Token::Ident,
+        Ident::UserDefined, Op::ADD, Op::DIV, Op::MUL, Op::SUB, RelOp::EQ, RelOp::GE, RelOp::GT,
+        RelOp::LE, RelOp::LT, RelOp::NE, Symbol, Token, Token::Ident,
     },
     tokenizer::Tokenizer,
 };
 use crate::frontend::operators::Inst;
-
+use crate::frontend::operators::Operator;
+use crate::frontend::parsing::block::Block;
+use crate::frontend::parsing::result::{Kind, Result};
 use std::collections::{HashMap, LinkedList};
 
 pub struct Parser {
     tokens: Vec<Token>,
-    blocks: LinkedList<LinkedList<Inst>>,
+    blocks: LinkedList<Block>,
     vars: HashMap<Token, i32>,
+    funcs: HashMap<String, Token>,
     cur_token_index: usize,
-    cur_block: Option<LinkedList<Inst>>,
+    cur_block: Block,
+    // busy: Vec<i32>,
+    total_inst: i32,
 }
 
 impl Parser {
-    fn new(input: String) -> Self {
+    pub fn new(input: String) -> Self {
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
         let tokens = tokenizer.get_tokens();
         // if tokens.len() < 0 {
         //     panic!("No User Input/Toeken");
         // }
+        // let mut busy = vec![0; 32];
+        // busy[0] = 1; // register 0
         Self {
             tokens,
             blocks: LinkedList::new(),
             vars: HashMap::new(),
+            funcs: HashMap::new(),
             cur_token_index: 0,
-            cur_block: None,
+            cur_block: Block::new(0, "blcok".to_string()),
+            // busy,
+            total_inst: 0,
         }
     }
     fn current(&self) -> &Token {
@@ -102,7 +112,7 @@ impl Parser {
     fn assignment(&mut self) {
         // "let" ident "<-"  expression
         self.move_token();
-        if self.current() != &Token::Ident("".to_string()) {
+        if matches!(self.current(), &Token::Ident(UserDefined(_))) {
             panic!("Error: Invalid Assignment Format, Missing Identifier");
         }
         let var = self.current().clone();
@@ -116,10 +126,16 @@ impl Parser {
     }
     fn funcCall(&mut self) {
         // "call" ident [ "(" [expression {"," expression}] ")"]
+        self.move_token();
     }
-    fn ifStatement(&mut self) {
+    fn if_statement(&mut self) {
         // "if" relation "then" statSequence ["else" statSequence] "fi"
         // new block: if, then, else, fi
+        let mut if_block = Some(Block::new(self.blocks.len() as i32, "if_".to_string()));
+        let mut then_block = Some(Block::new(self.blocks.len() as i32, "then_".to_string()));
+        let mut else_block = Some(Block::new(self.blocks.len() as i32, "else_".to_string()));
+        let mut fi_block = Some(Block::new(self.blocks.len() as i32, "fi_".to_string()));
+
         self.move_token();
         self.relation(); // TODO: Return value 
         self.move_token();
@@ -127,24 +143,39 @@ impl Parser {
             panic!("Error: Invalid If Statement Format, Missing \"then\"");
         }
         self.move_token();
-        self.statSequence();
+        self.stat_sequence();
         self.move_token();
-        if self.current() != &Token::Else {
-            panic!("Error: Invalid If Statement Format, Missing \"else\"");
+        if self.current() == &Token::Else {
+            // since else is optional
+            self.move_token();
+            self.stat_sequence();
+            self.move_token();
         }
-        self.move_token();
-        self.statSequence();
-        self.move_token();
+
         if self.current() != &Token::Fi {
             panic!("Error: Invalid If Statement Format, Missing \"fi\"");
         }
     }
-    fn whileStatement(&self) {
+    fn while_statement(&mut self) {
         // "while" relaton "do" StatSequence "od"
         // new block: while, then
+        self.move_token();
+        self.relation(); // TODO: Return Value 
+        self.move_token();
+        if self.current() != &Token::Do {
+            panic!("Error: Invalid While Statement Format, Missing \"do\"");
+        }
+        self.move_token();
+        self.stat_sequence(); // 
+        self.move_token();
+        if self.current() != &Token::Od {
+            panic!("Error: Invalid While Statement Format, Missing \"od\"");
+        }
     }
-    fn returnStatement(&self) {
-        // assignment | funcCall | ifStatement | whileStatement | returnStatement
+    fn return_statement(&mut self) {
+        // "return" [ expression ]
+        self.move_token();
+        self.expression();
     }
     fn statement(&mut self) {
         // statement {";" statement } [";"]
@@ -152,14 +183,14 @@ impl Parser {
         match self.current() {
             &Token::Let => self.assignment(),
             &Token::Call => self.funcCall(),
-            &Token::If => self.ifStatement(),
-            &Token::While => self.whileStatement(),
-            &Token::Return => self.returnStatement(),
+            &Token::If => self.if_statement(),
+            &Token::While => self.while_statement(),
+            &Token::Return => self.return_statement(),
             _ => panic!("Error: Invalid Statement format"),
         }
     }
-    fn statSequence(&mut self) {
-        // statement {";" statement } [";"]
+    fn stat_sequence(&mut self) {
+        // assignment | funcCall | ifStatement | whileStatement | returnStatement
         self.move_token();
         self.statement();
         self.move_token();
@@ -168,7 +199,7 @@ impl Parser {
             self.statement();
         }
     }
-    fn varDecl(&mut self) {
+    fn var_decl(&mut self) {
         // "var" ident {"," ident} ";"
         self.move_token();
         if matches!(self.current(), &Ident(_)) {
@@ -189,7 +220,7 @@ impl Parser {
             panic!("Error: Missing SemiColon: \";\"");
         }
     }
-    fn funcDecl(&mut self) {
+    fn func_decl(&mut self) {
         // ["void"] "function" ident formalParam ";" funcBody ";"
         // new block
         self.move_token();
@@ -198,7 +229,7 @@ impl Parser {
             if matches!(self.current(), &Token::Ident(_)) {}
         }
     }
-    fn formalParam(&mut self) {
+    fn formal_param(&mut self) {
         // "( [ident {"," ident}] ")"
         self.move_token();
         if self.current() == &Token::Symbol(Symbol::OpenParen) {
@@ -209,7 +240,7 @@ impl Parser {
             self.move_token();
             while self.current() == &Token::Symbol(Symbol::SemiColon) {
                 self.move_token();
-                if self.current() == &Token::Ident("".to_string()) {
+                if matches!(self.current(), &Token::Ident(UserDefined(_))) {
                     // do something with identifier
                 }
                 self.move_token();
@@ -221,27 +252,27 @@ impl Parser {
             }
         }
     }
-    fn funcBody(&mut self) {
+    fn func_body(&mut self) {
         // [varDecl] "{" [statSequence] "}"
-        self.varDecl();
+        self.var_decl();
     }
     fn computation(&mut self) {
         // "main" [varDecl] {funcDecl} "{" statSequence "}" "."
         while self.current() == &Token::Main {
             self.move_token();
             if self.current() == &Token::Symbol(Symbol::Period) {
-                break;
+                break; // end
             }
             if self.current() == &Token::Var {
                 // Var Decl Path
-                self.varDecl();
+                self.var_decl();
             }
             if self.current() == &Token::Void {
                 // Func Decl Path
-                self.funcDecl();
+                self.func_decl();
             }
             if self.current() == &Token::Symbol(Symbol::OpenBrace) {
-                self.statSequence(); // Stat Sequence Path
+                self.stat_sequence(); // Stat Sequence Path
                 if self.current() == &Token::Symbol(Symbol::CloseBrace) {
                     self.move_token();
                 } else {
@@ -253,4 +284,72 @@ impl Parser {
             panic!("Eror: Missing Period: \".\"");
         }
     }
+
+    // helper functions to add instruction to the current block
+    fn add_inst_to_tail(&mut self, op: Operator) {
+        self.total_inst += 1;
+        let data = (self.total_inst, op);
+        let new_inst = Inst::new(data);
+        self.cur_block.push_tail(new_inst);
+    }
+
+    fn add_inst_to_head(&mut self, op: Operator) {
+        self.total_inst += 1;
+        let data = (self.total_inst, op);
+        let new_inst = Inst::new(data);
+        self.cur_block.push_head(new_inst);
+    }
+
+    // pub fn arithm(&mut self, op: Operator, x: &mut Result, y: &mut Result) {
+    //     let mut z = Result::new(Kind::Const, 0, 0, 0);
+    //     if x.get_kind() == Kind::Const && y.get_kind() == Kind::Const {
+    //         let x_value = x.get_value();
+    //         let y_value = y.get_value();
+    //         match op {
+    //             Operator::Add(_, _) => z.set_value(x_value + y_value),
+    //             Operator::Mul(_, _) => z.set_value(x_value * y_value),
+    //             Operator::Sub(_, _) => z.set_value(x_value - y_value),
+    //             Operator::Div(_, _) => z.set_value(x_value / y_value),
+    //             _ => (),
+    //         }
+    //     } else {
+    //         self.load(x);
+    //         if y.get_kind() == Kind::Const {
+    //             z.set_regn(self.allocateReg());
+    //             // PUT immop[op], z.regn, x.regn, y.value
+    //             self.deallocate(x.get_regn());
+    //             z.set_kind(Kind::Reg);
+    //         } else {
+    //             self.load(y);
+    //             z.set_regn(self.allocateReg());
+    //             self.deallocate(x.get_regn());
+    //             self.deallocate(y.get_regn());
+    //         }
+    //     }
+    // }
+
+    // fn allocateReg(&mut self) -> i32 {
+    //     for i in 1..32 {
+    //         if self.busy[i] == 0 {
+    //             return i as i32;
+    //         }
+    //     }
+    //     return -1;
+    // }
+
+    // fn deallocate(&mut self, i: i32) {
+    //     self.busy[i as usize] = 0;
+    // }
+
+    // pub fn load(&mut self, x: &mut Result) {
+    //     if x.get_kind() == Kind::Const {
+    //         x.set_regn(self.allocateReg());
+    //         x.set_kind(Kind::Reg);
+    //         // Put occurs: ADDI x.regn, 0, x.value
+    //     } else if x.get_kind() == Kind::Var {
+    //         x.set_regn(self.allocateReg());
+    //         // Put occurs: LOAD x.regn, base_reg, x.address
+    //         x.set_kind(Kind::Reg);
+    //     }
+    // }
 }
