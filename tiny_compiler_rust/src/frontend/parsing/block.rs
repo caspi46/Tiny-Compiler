@@ -1,8 +1,9 @@
 // use crate::frontend::operators::Operator::{
 //     self, Add, Beq, Bge, Bgt, Ble, Blt, Bne, Bra, Cmp, Const, Div, End, Jsr, Mul, Phi, Ret, Sub,
 // };
+use crate::frontend::fsm::token::{Ident, Token};
 use crate::frontend::operators::inst::Inst;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 // use std::cell::RefCell;
 // use std::rc::Rc;
 
@@ -11,6 +12,7 @@ use std::collections::VecDeque;
 pub struct Block {
     block_name: String,
     insts: VecDeque<Inst>,
+    table: HashMap<Ident, i32>,
 }
 
 impl<'a> Block {
@@ -20,6 +22,7 @@ impl<'a> Block {
         Self {
             block_name,
             insts: VecDeque::new(),
+            table: HashMap::new(),
         }
     }
 
@@ -37,5 +40,9 @@ impl<'a> Block {
 
     pub fn push_tail(&mut self, new_tail: Inst) {
         self.insts.push_back(new_tail);
+    }
+
+    pub fn fill_in_table(&mut self, ident: Ident, inst_num: i32) {
+        self.table.insert(ident, inst_num);
     }
 }

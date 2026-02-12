@@ -15,7 +15,7 @@ pub struct Parser {
     tokens: Vec<Token>,
     blocks: LinkedList<Block>,
     vars: HashMap<Token, i32>,
-    funcs: HashMap<String, Token>,
+    funcs: HashMap<Token, Vec<Token>>,
     cur_token_index: usize,
     cur_block: Block,
     // busy: Vec<i32>,
@@ -199,6 +199,8 @@ impl Parser {
             self.statement();
         }
     }
+
+    // TODO: TEST
     fn var_decl(&mut self) {
         // "var" ident {"," ident} ";"
         self.move_token();
@@ -220,28 +222,39 @@ impl Parser {
             panic!("Error: Missing SemiColon: \";\"");
         }
     }
+
+    // TODO: TEST
     fn func_decl(&mut self) {
         // ["void"] "function" ident formalParam ";" funcBody ";"
         // new block
         self.move_token();
-        if self.current() == &Token::Function {
-            self.move_token();
-            if matches!(self.current(), &Token::Ident(_)) {}
+        if self.current() != &Token::Function {
+            panic!("Error: Missing function keyword: Function");
         }
+        self.move_token();
+        if !matches!(self.current(), &Token::Ident(_)) {
+            panic!("Error: Missing function name: Ident(_)");
+        }
+        let func = self.current().clone();
+        let params = self.formal_param();
+        self.funcs.insert(func, params);
     }
-    fn formal_param(&mut self) {
+    fn formal_param(&mut self) -> Vec<Token> {
         // "( [ident {"," ident}] ")"
+        let mut params: Vec<Token> = vec![];
         self.move_token();
         if self.current() == &Token::Symbol(Symbol::OpenParen) {
             self.move_token();
             if matches!(self.current(), &Token::Ident(_)) {
                 // do something with identifier
+                params.push(self.current().clone());
             }
             self.move_token();
             while self.current() == &Token::Symbol(Symbol::SemiColon) {
                 self.move_token();
                 if matches!(self.current(), &Token::Ident(UserDefined(_))) {
                     // do something with identifier
+                    params.push(self.current().clone());
                 }
                 self.move_token();
             }
@@ -251,6 +264,7 @@ impl Parser {
                 panic!("Error: Missing Closed Parenthesis: \")\"");
             }
         }
+        params
     }
     fn func_body(&mut self) {
         // [varDecl] "{" [statSequence] "}"
@@ -261,7 +275,7 @@ impl Parser {
         while self.current() == &Token::Main {
             self.move_token();
             if self.current() == &Token::Symbol(Symbol::Period) {
-                break; // end
+                break; // in case there is no variable or { }
             }
             if self.current() == &Token::Var {
                 // Var Decl Path
@@ -299,6 +313,8 @@ impl Parser {
         let new_inst = Inst::new(data);
         self.cur_block.push_head(new_inst);
     }
+
+    fn set_up_table(&mut self) {}
 
     // pub fn arithm(&mut self, op: Operator, x: &mut Result, y: &mut Result) {
     //     let mut z = Result::new(Kind::Const, 0, 0, 0);
