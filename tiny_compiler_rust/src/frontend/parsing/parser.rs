@@ -5,21 +5,23 @@ use crate::frontend::fsm::{
     },
     tokenizer::Tokenizer,
 };
-use crate::frontend::operators::Inst;
-use crate::frontend::operators::Operator;
+use crate::frontend::operators::{Inst, InstStorage, Operator};
 use crate::frontend::parsing::block::Block;
 use crate::frontend::parsing::result::{Kind, Result};
 use std::collections::{HashMap, LinkedList};
 
+#[derive()]
 pub struct Parser {
     tokens: Vec<Token>,
     blocks: LinkedList<Block>,
     vars: HashMap<Token, i32>,
+    insts: HashMap<Operator, i32>,
     funcs: HashMap<Token, Vec<Token>>,
     cur_token_index: usize,
     cur_block: Block,
     // busy: Vec<i32>,
     total_inst: i32,
+    inst_storage: InstStorage,
 }
 
 impl Parser {
@@ -36,11 +38,13 @@ impl Parser {
             tokens,
             blocks: LinkedList::new(),
             vars: HashMap::new(),
+            insts: HashMap::new(),
             funcs: HashMap::new(),
             cur_token_index: 0,
             cur_block: Block::new(0, "blcok".to_string()),
             // busy,
             total_inst: 0,
+            inst_storage: InstStorage::new(),
         }
     }
     fn current(&self) -> &Token {
@@ -54,30 +58,54 @@ impl Parser {
         self.cur_token_index += 1;
     }
 
-    fn factor(&self) {
+    fn factor(&mut self) -> String {
         // ident | number | "(" expression ")" | funcCall
-        if self.current() == &Token::Symbol(Symbol::OpenParen) {
-            if self.current() == &Token::Symbol(Symbol::CloseParen) {
-            } else {
-                panic!("Error, missing closed parentheses, \")\"");
+        match self.current() {
+            Token::Symbol(Symbol::OpenParen) => {
+                self.expression();
+                self.move_token();
+                if self.current() == &Token::Symbol(Symbol::CloseParen) {
+                } else {
+                    panic!("Error, missing closed parentheses, \")\"");
+                }
+                return "".to_string();
             }
-        } else if matches!(self.current(), &Token::Number(_)) {
+            Token::Number(num) => {
+                return num.clone();
+            }
+            Token::Ident(UserDefined(var)) => {
+                return var.clone();
+            }
+            Token::Call => {
+                return "".to_string(); // Should call funcCall
+            }
+            _ => {
+                panic!("Error: Invalid factor format");
+            }
         }
     }
     fn term(&mut self) {
         // factor { ("*" | "/") factor }
-        self.factor();
+        let x = self.factor().clone();
+        // self.vars.insert(x, self.total_inst);
         self.move_token();
-        while self.current() == &Token::Op(MUL) {
+        while matches!(self.current(), Token::Op(MUL)) {
             self.move_token();
-            self.factor();
+            let y = self.factor();
+            let mul_op = Operator::Mul(x.clone(), y);
+            self.add_inst_to_tail(mul_op.clone());
+            self.insts.insert(mul_op, self.total_inst);
         }
-        while self.current() == &Token::Op(DIV) {
+
+        while matches!(self.current(), Token::Op(DIV)) {
             self.move_token();
-            self.factor();
+            let y = self.factor();
+            let div_op = Operator::Div(x.clone(), y);
+            self.add_inst_to_tail(div_op.clone());
+            self.insts.insert(div_op, self.total_inst);
         }
     }
-    fn expression(&mut self) {
+    fn expression(&mut self) -> i32 {
         // term { ("+" | "-") terrm }
         self.term();
         self.move_token();
@@ -90,22 +118,31 @@ impl Parser {
             self.move_token();
             self.factor();
         }
+        0 // for now
     }
     fn relation(&mut self) {
-        // expression relOp expression
-        self.expression();
-        self.move_token();
-        match self.current() {
-            &Token::RelOp(EQ) => (),
-            &Token::RelOp(NE) => (),
-            &Token::RelOp(GT) => (),
-            &Token::RelOp(LT) => (),
-            &Token::RelOp(GE) => (),
-            &Token::RelOp(LE) => (),
-            _ => {
-                panic!("Error, missing relOp: ==, !=, >, <, >=, <=");
-            }
-        }
+        // should return
+        // // expression relOp expression
+        // let first = self.expression(); // first in RelOp (v1, v2)
+        // self.move_token();
+        // match self.current() {
+        //     &Token::RelOp(EQ) => {
+        //         self.move_token();
+        //         let second = self.expression();
+        //         let cmp = Operator::Cmp(first, second);
+        //         self.add_inst_to_tail(cmp);
+        //         let eq = Operator::Eq(first, second);
+        //         self.add_inst_to_tail(eq);
+        //     }
+        //     &Token::RelOp(NE) => (),
+        //     &Token::RelOp(GT) => (),
+        //     &Token::RelOp(LT) => (),
+        //     &Token::RelOp(GE) => (),
+        //     &Token::RelOp(LE) => (),
+        //     _ => {
+        //         panic!("Error, missing relOp: ==, !=, >, <, >=, <=");
+        //     }
+        // }
         self.move_token();
         self.expression();
     }
@@ -122,8 +159,10 @@ impl Parser {
         }
         self.move_token();
         self.expression(); // TODO: Return value (Identify the value)
-        self.vars.insert(var, -1); // just for now
+        self.vars.insert(var, self.total_inst);
+        self.total_inst += 1;
     }
+
     fn funcCall(&mut self) {
         // "call" ident [ "(" [expression {"," expression}] ")"]
         self.move_token();
