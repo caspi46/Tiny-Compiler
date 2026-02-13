@@ -2,39 +2,39 @@
 #[derive(PartialEq, Debug, Clone, Hash, Eq)]
 pub enum Operator {
     //Constant
-    Const(String),
+    Const(i32),
     // Op
-    Add(String, String),
-    Sub(String, String),
-    Mul(String, String),
-    Div(String, String),
+    Add(i32, i32),
+    Sub(i32, i32),
+    Mul(i32, i32),
+    Div(i32, i32),
     // Compare
-    Cmp(String, String),
+    Cmp(i32, i32),
     // Phi function
-    Phi(String, String),
+    Phi(i32, i32),
     // End
     End,
     // RelOp
-    Bra(String, String),
-    Bne(String, String),
-    Ble(String, String),
-    Bge(String, String),
-    Bgt(String, String),
-    Beq(String, String),
-    Blt(String, String),
+    Bra(i32, i32),
+    Bne(i32, i32),
+    Ble(i32, i32),
+    Bge(i32, i32),
+    Bgt(i32, i32),
+    Beq(i32, i32),
+    Blt(i32, i32),
 
     // Read & Write
     Read,
     Write(String),
     WriteNL,
     // Operator for user-defined functions
-    Jsr(String),
-    Ret(String),
+    Jsr(i32),
+    Ret(i32),
     // For now, only three parameters
     GetPar1,
     GetPar2,
     GetPar3,
-    SetPar1(String),
-    SetPar2(String),
-    SetPar3(String),
+    SetPar1(i32),
+    SetPar2(i32),
+    SetPar3(i32),
 }
