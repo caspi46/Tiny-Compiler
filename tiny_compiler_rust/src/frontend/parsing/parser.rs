@@ -8,18 +8,21 @@ use crate::frontend::fsm::{
 use crate::frontend::operators::{Inst, InstStorage, Operator};
 use crate::frontend::parsing::block::Block;
 use crate::frontend::parsing::result::{Kind, Result};
-use std::collections::{HashMap, LinkedList};
+use std::cell::{Ref, RefCell};
+use std::collections::{BTreeMap, HashMap, LinkedList};
+use std::sync::Arc;
 
 #[derive()]
 pub struct Parser {
     tokens: Vec<Token>,
-    blocks: LinkedList<Block>,
+    blocks: BTreeMap<usize, Block>,
     vars: HashMap<Token, i32>,
     insts: HashMap<Operator, i32>,
     funcs: HashMap<Token, Vec<Token>>,
     cur_token_index: usize,
     cur_block: Block,
     // busy: Vec<i32>,
+    block0: Block, // after the computation, it will be added in top
     total_inst: i32,
     inst_storage: InstStorage,
 }
@@ -34,9 +37,12 @@ impl Parser {
         // }
         // let mut busy = vec![0; 32];
         // busy[0] = 1; // register 0
+        let mut block0 = Block::new(0, "block_".to_string());
+        let zero_inst = Inst::new((0, Operator::Const(0)));
+        block0.push_head(zero_inst);
         Self {
             tokens,
-            blocks: LinkedList::new(),
+            blocks: BTreeMap::new(),
             vars: HashMap::new(),
             insts: HashMap::new(),
             funcs: HashMap::new(),
@@ -45,6 +51,7 @@ impl Parser {
             // busy,
             total_inst: 0,
             inst_storage: InstStorage::new(),
+            block0,
         }
     }
     fn current(&self) -> &Token {
@@ -58,26 +65,41 @@ impl Parser {
         self.cur_token_index += 1;
     }
 
-    fn factor(&mut self) -> String {
+    fn factor(&mut self) -> i32 {
+        // return: i32
         // ident | number | "(" expression ")" | funcCall
+
         match self.current() {
             Token::Symbol(Symbol::OpenParen) => {
-                self.expression();
+                let inst_num = self.expression();
                 self.move_token();
                 if self.current() == &Token::Symbol(Symbol::CloseParen) {
                 } else {
                     panic!("Error, missing closed parentheses, \")\"");
                 }
-                return "".to_string();
+                return inst_num;
             }
             Token::Number(num) => {
-                return num.clone();
+                // add num value in block 0
+                let inst_num = -1 * self.block0.get_inst_num();
+                let op = Operator::Const(*num);
+                if !self.insts.contains_key(&op) {
+                    let new_num = Inst::new((inst_num, op.clone()));
+                    self.block0.push_tail(new_num);
+                    self.insts.insert(op, inst_num);
+                }
+                return inst_num;
             }
             Token::Ident(UserDefined(var)) => {
-                return var.clone();
+                if let Some(&inst_num) = self.cur_block.check_table(var) {
+                    return inst_num;
+                }
+                self.total_inst += 1;
+                return self.total_inst;
             }
             Token::Call => {
-                return "".to_string(); // Should call funcCall
+                let inst_num = self.func_call();
+                return -1; // Should call funcCall
             }
             _ => {
                 panic!("Error: Invalid factor format");
@@ -92,7 +114,7 @@ impl Parser {
         while matches!(self.current(), Token::Op(MUL)) {
             self.move_token();
             let y = self.factor();
-            let mul_op = Operator::Mul(x.clone(), y);
+            let mul_op = Operator::Mul(x, y);
             self.add_inst_to_tail(mul_op.clone());
             self.insts.insert(mul_op, self.total_inst);
         }
@@ -100,7 +122,7 @@ impl Parser {
         while matches!(self.current(), Token::Op(DIV)) {
             self.move_token();
             let y = self.factor();
-            let div_op = Operator::Div(x.clone(), y);
+            let div_op = Operator::Div(x, y);
             self.add_inst_to_tail(div_op.clone());
             self.insts.insert(div_op, self.total_inst);
         }
@@ -163,17 +185,25 @@ impl Parser {
         self.total_inst += 1;
     }
 
-    fn funcCall(&mut self) {
+    fn func_call(&mut self) -> i32 {
         // "call" ident [ "(" [expression {"," expression}] ")"]
         self.move_token();
+        match self.current() {
+            Token::Ident(InputNum) => (),
+            Token::Ident(OutputNum) => (),
+            Token::Ident(OutputNewLine) => (),
+            Token::Ident(UserDefined(var)) => (),
+            _ => panic!("Error: Invalid funcCall format"),
+        };
+        -1
     }
     fn if_statement(&mut self) {
         // "if" relation "then" statSequence ["else" statSequence] "fi"
         // new block: if, then, else, fi
-        let mut if_block = Some(Block::new(self.blocks.len() as i32, "if_".to_string()));
-        let mut then_block = Some(Block::new(self.blocks.len() as i32, "then_".to_string()));
-        let mut else_block = Some(Block::new(self.blocks.len() as i32, "else_".to_string()));
-        let mut fi_block = Some(Block::new(self.blocks.len() as i32, "fi_".to_string()));
+        // let mut if_block = Some(Block::new(self.blocks.len() as i32, "if_".to_string()));
+        // let mut then_block = Some(Block::new(self.blocks.len() as i32, "then_".to_string()));
+        // let mut else_block = Some(Block::new(self.blocks.len() as i32, "else_".to_string()));
+        // let mut fi_block = Some(Block::new(self.blocks.len() as i32, "fi_".to_string()));
 
         self.move_token();
         self.relation(); // TODO: Return value 
@@ -216,17 +246,32 @@ impl Parser {
         self.move_token();
         self.expression();
     }
-    fn statement(&mut self) {
+    fn statement(&mut self) -> i32 {
         // statement {";" statement } [";"]
+        // placeholder for now
+        // each function should return i32 value (inst#) like func_call
         self.move_token();
         match self.current() {
-            &Token::Let => self.assignment(),
-            &Token::Call => self.funcCall(),
-            &Token::If => self.if_statement(),
-            &Token::While => self.while_statement(),
-            &Token::Return => self.return_statement(),
+            &Token::Let => {
+                self.assignment();
+                -1
+            }
+            &Token::Call => self.func_call(),
+            &Token::If => {
+                self.if_statement();
+                -1
+            }
+            &Token::While => {
+                self.while_statement();
+                -1
+            }
+            &Token::Return => {
+                self.return_statement();
+                -1
+            }
             _ => panic!("Error: Invalid Statement format"),
-        }
+        };
+        -1
     }
     fn stat_sequence(&mut self) {
         // assignment | funcCall | ifStatement | whileStatement | returnStatement
