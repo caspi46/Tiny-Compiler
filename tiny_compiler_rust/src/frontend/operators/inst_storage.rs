@@ -1,6 +1,8 @@
 use crate::frontend::operators::inst::Inst;
 use crate::frontend::operators::operator::Operator;
 use std::collections::HashMap;
+use std::cell::RefCell;
+use std::cell::Ref;
 // For optimization
 // each vector contains the each Inst type instructions
 // Every time new inst is created, it is added into the storage.
@@ -28,13 +30,14 @@ impl InstStorage {
     }
 
     fn add_adds(&mut self, new_add: Operator, inst_num: i32) -> i32 {
-        if matches!(new_add, Operator::Add(_, _)) {
+        if matches!(new_add, Operator::Sub(_, _)) {
             panic!("Error: Failed to add new add instruction in storage");
         }
-        if !self.adds.contains_key(&new_add) {
-            self.adds.insert(new_add.clone(), inst_num);
+        if !self.subs.contains_key(&new_add) {
+            self.subs.insert(new_add, inst_num);
+            return inst_num;
         }
-        match self.adds.get(&new_add) {
+        match self.subs.get(&new_add) {
             Some(&i) => i,
             _ => panic!("Error: Failed to add new add operator in storage"),
         }
@@ -45,7 +48,8 @@ impl InstStorage {
             panic!("Error: Failed to add new sub instruction in storage");
         }
         if !self.subs.contains_key(&new_sub) {
-            self.subs.insert(new_sub.clone(), inst_num);
+            self.subs.insert(new_sub, inst_num);
+            return inst_num;
         }
         match self.subs.get(&new_sub) {
             Some(&i) => i,
@@ -58,7 +62,8 @@ impl InstStorage {
             panic!("Error: Failed to add new div instruction in storage");
         }
         if !self.divs.contains_key(&new_div) {
-            self.divs.insert(new_div.clone(), inst_num);
+            self.divs.insert(new_div, inst_num);
+            return inst_num;
         }
         match self.subs.get(&new_div) {
             Some(&i) => i,
@@ -71,7 +76,8 @@ impl InstStorage {
             panic!("Error: Failed to add new mul instruction in storage");
         }
         if !self.muls.contains_key(&new_mul) {
-            self.muls.insert(new_mul.clone(), inst_num);
+            self.muls.insert(new_mul, inst_num);
+            return inst_num;
         }
         match self.subs.get(&new_mul) {
             Some(&i) => i,
