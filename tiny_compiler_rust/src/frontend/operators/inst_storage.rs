@@ -1,8 +1,8 @@
 use crate::frontend::operators::inst::Inst;
 use crate::frontend::operators::operator::Operator;
-use std::collections::HashMap;
-use std::cell::RefCell;
 use std::cell::Ref;
+use std::cell::RefCell;
+use std::collections::HashMap;
 // For optimization
 // each vector contains the each Inst type instructions
 // Every time new inst is created, it is added into the storage.
