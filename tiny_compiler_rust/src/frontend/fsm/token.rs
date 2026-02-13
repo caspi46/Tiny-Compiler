@@ -2,7 +2,7 @@ use std::fmt;
 // Tokens
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub enum Token {
-    Number(String),
+    Number(i32),
     Ident(Ident), // variable name (predefined, user-defined)
     Call,
     Let,
