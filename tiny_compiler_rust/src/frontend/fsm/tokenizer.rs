@@ -134,11 +134,12 @@ impl Tokenizer {
     }
 
     fn is_number(&mut self, cur_token: &str) -> bool {
-        if cur_token.parse::<i32>().is_ok() {
-            self.tokens.push(Token::Number(String::from(cur_token)));
-            return true;
-        }
-        false
+        let num: i32 = match cur_token.parse() {
+            Ok(n) => n,
+            _ => return false,
+        };
+        self.tokens.push(Token::Number(num));
+        true
     }
 
     fn is_ident(&mut self, cur_token: &str) -> bool {
