@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 pub struct Block {
     block_name: String,
     insts: VecDeque<Inst>,
-    table: HashMap<Ident, i32>,
+    table: HashMap<String, i32>,
     prevs: Vec<Block>,
     nexts: Vec<Block>,
 }
@@ -85,8 +85,15 @@ impl<'a> Block {
 
     /// update_table
     /// update the ident's information in the table
-    pub fn update_table(&mut self, ident: Ident, inst_num: i32) {
+    pub fn update_table(&mut self, ident: String, inst_num: i32) {
         self.table.insert(ident, inst_num);
+    }
+
+    /// check_table
+    /// check if the ident exists in the table
+    /// if so, return the inst#
+    pub fn check_table(&self, ident: &String) -> Option<&i32> {
+        self.table.get(ident)
     }
 
     // pub fn fill_in_table(&mut self, ident: Ident, inst_num: i32) {
