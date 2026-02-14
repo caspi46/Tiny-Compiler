@@ -97,9 +97,9 @@ impl Parser {
                 self.total_inst += 1;
                 return self.total_inst;
             }
-            Token::Call => {
+            Token::Call => { // skip for now (maybe after I solve the ident and num)
                 let inst_num = self.func_call();
-                return -1; // Should call funcCall
+                return inst_num; // Should call funcCall 
             }
             _ => {
                 panic!("Error: Invalid factor format");
@@ -126,10 +126,12 @@ impl Parser {
             self.add_inst_to_tail(div_op.clone());
             self.insts.insert(div_op, self.total_inst);
         }
+        // should return i32 
+        // i32 is the inst# that takes the calculation result
     }
     fn expression(&mut self) -> i32 {
         // term { ("+" | "-") terrm }
-        self.term();
+        self.term(); // return the 
         self.move_token();
         while self.current() == &Token::Op(ADD) {
             self.move_token();
@@ -141,6 +143,7 @@ impl Parser {
             self.factor();
         }
         0 // for now
+        // TODO: return the i32 value for that takes the calculation for example: add (1) (2) -> (1)
     }
     fn relation(&mut self) {
         // should return
@@ -213,12 +216,17 @@ impl Parser {
         }
         self.move_token();
         self.stat_sequence();
+        // create phi functioins here for fi block (LEFT in Phi(Left, Right)) 
+        // At this point Right should be the original inst# 
+        // TODO: identify which variable is updated 
         self.move_token();
         if self.current() == &Token::Else {
             // since else is optional
             self.move_token();
             self.stat_sequence();
             self.move_token();
+            // update phi functions here for fi block 
+            // TODO: identify which variable is updated 
         }
 
         if self.current() != &Token::Fi {

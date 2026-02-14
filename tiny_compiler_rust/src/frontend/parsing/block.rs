@@ -8,6 +8,15 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 // use std::rc::Rc;
 
 // type Link = Option<Rc<RefCell<Inst>>>;
+/// Block 
+/// Fields:
+///     block_name : the name of the block 
+///     insts: the total insts in the block in order
+///     table: the table to identify which variable is which inst#
+///            The format is variable_name : inst# 
+///            
+///     prevs: previous blocks
+///     nexts: next blocks
 #[derive(Debug, Eq, PartialEq)]
 pub struct Block {
     block_name: String,
