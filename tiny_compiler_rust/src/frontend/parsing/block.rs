@@ -3,6 +3,7 @@
 // };
 use crate::frontend::fsm::token::{Ident, Token};
 use crate::frontend::operators::{inst::Inst, operator::Operator};
+use std::cell::{Ref, RefCell};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 // use std::cell::RefCell;
 // use std::rc::Rc;
@@ -20,35 +21,35 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Block {
     block_name: String,
+    block_num: usize,
     insts: VecDeque<Inst>,
     table: HashMap<String, i32>,
-    prevs: Vec<Block>,
-    nexts: Vec<Block>,
+    nexts: Vec<usize>,
 }
 
 impl<'a> Block {
-    pub fn new(cur_num: i32, name: String) -> Self {
+    pub fn new(cur_num: usize, name: String, table: HashMap<String, i32>) -> Self {
         let block_name = name + &cur_num.to_string();
 
         Self {
             block_name,
+            block_num: cur_num,
             insts: VecDeque::new(),
-            table: HashMap::new(),
-            prevs: Vec::new(),
+            table: table,
             nexts: Vec::new(),
         }
     }
 
-    /// add_prev
-    /// add new prev block in block's prevs
-    pub fn add_prev(&mut self, prev_block: Block) {
-        self.prevs.push(prev_block);
-    }
+    // /// add_prev
+    // /// add new prev block in block's prevs
+    // pub fn add_prev(&mut self, block_num: usize) {
+    //     self.prevs.borrow_mut().push(block_num);
+    // }
 
     /// add_next
     /// add new next block in block's next
-    pub fn add_next(&mut self, next_block: Block) {
-        self.nexts.push(next_block);
+    pub fn add_next(&mut self, block_num: usize) {
+        self.nexts.push(block_num);
     }
 
     /// get_head
@@ -103,6 +104,10 @@ impl<'a> Block {
     /// if so, return the inst#
     pub fn check_table(&self, ident: &String) -> Option<&i32> {
         self.table.get(ident)
+    }
+
+    pub fn get_block_num(&self) -> usize {
+        self.block_num
     }
 
     // pub fn fill_in_table(&mut self, ident: Ident, inst_num: i32) {

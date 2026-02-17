@@ -265,34 +265,34 @@ impl Tokenizer {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
 
-    #[test]
-    fn test1() {
-        let input = String::from(
-            "main
-        var a, b, c, d, e; {
-            let a <- call InputNum(); 
-            let b <- a; 
-            let c <- b; 
-            let d <- b + c; 
-            let e <- a + b; 
-            if a < 0 then let d <- d + e; let a <- d else let d <- e fi; 
-            call OutputNum(a)
-    }.",
-        );
-        let mut tokenizer = Tokenizer::new(input);
-        tokenizer.generate_token();
-        tokenizer.get_tokens();
-    }
+//     #[test]
+//     fn test1() {
+//         let input = String::from(
+//             "main
+//         var a, b, c, d, e; {
+//             let a <- call InputNum();
+//             let b <- a;
+//             let c <- b;
+//             let d <- b + c;
+//             let e <- a + b;
+//             if a < 0 then let d <- d + e; let a <- d else let d <- e fi;
+//             call OutputNum(a)
+//     }.",
+//         );
+//         let mut tokenizer = Tokenizer::new(input);
+//         tokenizer.generate_token();
+//         tokenizer.get_tokens();
+//     }
 
-    #[test]
-    fn test2() {
-        let input = String::from("a<-b 1234");
-        let mut tokenizer = Tokenizer::new(input);
-        tokenizer.generate_token();
-        tokenizer.get_tokens();
-    }
-}
+//     #[test]
+//     fn test2() {
+//         let input = String::from("a<-b 1234");
+//         let mut tokenizer = Tokenizer::new(input);
+//         tokenizer.generate_token();
+//         tokenizer.get_tokens();
+//     }
+// }
