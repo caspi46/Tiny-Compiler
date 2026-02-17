@@ -268,7 +268,7 @@ impl Parser {
             Token::Ident(InputNum) => (),
             Token::Ident(OutputNum) => (),
             Token::Ident(OutputNewLine) => (),
-            Token::Ident(UserDefined(var)) => (),
+            Token::Ident(UserDefined(func)) => (),
             _ => panic!("Error: Invalid funcCall format"),
         };
         -1
@@ -323,7 +323,11 @@ impl Parser {
         self.switch_block(then_key);
         self.stat_sequence(); // add all the instructions in the then to the then block
         self.connect(if_key, then_key);
-        self.connect(then_key, fi_key);
+        if self.cur_block_num != then_key {
+            self.connect(self.cur_block_num, fi_key);
+        } else {
+            self.connect(then_key, fi_key);
+        }
         // create phi functioins here for fi block (LEFT in Phi(Left, Right))
         // At this point Right should be the original inst#
         // TODO: identify which variable is updated
@@ -340,9 +344,13 @@ impl Parser {
             // (if_block, else_block) = self.connect(if_block, else_block);
             self.blocks.insert(self.total_block, else_block);
             let else_key = self.total_block;
-            self.connect(else_key, fi_key);
             self.switch_block(else_key);
             self.stat_sequence();
+            if self.cur_block_num != else_key {
+                self.connect(self.cur_block_num, fi_key);
+            } else {
+                self.connect(else_key, fi_key);
+            }
             // update phi functions here for fi block
             // TODO: identify which variable is updated
             // find the phi function in the fi block
@@ -363,18 +371,57 @@ impl Parser {
     fn while_statement(&mut self) {
         // "while" relaton "do" StatSequence "od"
         // new block: while, then
-        self.move_token();
+        let before_table = self.vars.clone();
+        self.total_block += 1;
+        let while_num = self.total_block;
+        let while_block = RefCell::new(Block::new(
+            self.total_block,
+            "while_".to_string(),
+            before_table.clone(),
+        ));
+        self.blocks.insert(self.total_block, while_block);
+
+        self.total_block += 1;
+        let do_num = self.total_block;
+        let do_block = RefCell::new(Block::new(
+            self.total_block,
+            "do_".to_string(),
+            before_table.clone(),
+        ));
+        self.blocks.insert(self.total_block, do_block);
+
+        self.total_block += 1;
+        let od_num = self.total_block;
+        let od_block = RefCell::new(Block::new(
+            self.total_block,
+            "od_".to_string(),
+            before_table.clone(),
+        ));
+        self.blocks.insert(self.total_block, od_block);
+
+        // Edges
+        self.connect(self.cur_block_num, while_num);
+        self.connect(while_num, do_num);
+        self.connect(while_num, od_num);
+
+        self.switch_block(while_num);
         self.relation(); // TODO: Return Value 
-        self.move_token();
         if self.current() != &Token::Do {
             panic!("Error: Invalid While Statement Format, Missing \"do\"");
         }
-        self.move_token();
-        self.stat_sequence(); // 
-        self.move_token();
+        self.switch_block(do_num);
+        self.stat_sequence();
+        if self.cur_block_num == do_num {
+            self.connect(do_num, while_num);
+        } else {
+            self.connect(self.cur_block_num, while_num);
+        }
         if self.current() != &Token::Od {
             panic!("Error: Invalid While Statement Format, Missing \"od\"");
         }
+        self.switch_block(od_num);
+        self.connect(od_num, while_num);
+        self.move_token();
     }
     fn return_statement(&mut self) {
         // "return" [ expression ]
@@ -401,7 +448,12 @@ impl Parser {
                 self.return_statement();
                 -1
             }
-            Token::Symbol(Symbol::CloseBrace) | Token::Fi | Token::While | Token::Else => -1,
+            Token::Symbol(Symbol::CloseBrace)
+            | Token::Fi
+            | Token::While
+            | Token::Else
+            | Token::Od
+            | Token::Symbol(Symbol::CloseBrace) => -1,
             _ => panic!("Error: Invalid Statement format: {}", self.current()),
         };
 
@@ -795,6 +847,66 @@ fi
     else
     let a <- 67 + 67;
 fi
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+    }
+
+    #[test]
+    fn nested_if() {
+        let input = String::from(
+            "main
+        var a; {
+        let a <- 1;
+            if 1 == 2 then
+                if 1 == 2 then
+                    let a <- a - 1;
+                fi;
+    else if 1 == 3 then let a <- a - 1; fi;
+    let a <- 67 + 67;
+fi;
+let a <- 2;
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+    }
+    #[test]
+    fn nested_while() {
+        let input = String::from(
+            "main
+        var a; {
+        let a <- 1;
+            while 1 == 2 do
+                while 1 == 2 do 
+                    let a <- a - 1;
+                od
+            od
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+    }
+    #[test]
+    fn while_test() {
+        let input = String::from(
+            "main
+        var a; {
+        let a <- 1;
+            while 1 == 2 do
+                
+                    let a <- a - 1;
+                od
     }.",
         );
         let mut parse = Parser::new(input);
