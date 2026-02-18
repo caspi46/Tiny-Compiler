@@ -428,36 +428,30 @@ impl Parser {
         self.move_token();
         self.expression();
     }
-    fn statement(&mut self) -> i32 {
+    fn statement(&mut self) {
         // statement {";" statement } [";"]
         // placeholder for now
         // each function should return i32 value (inst#) like func_call
         self.move_token();
         match &self.current() {
-            Token::Let => self.assignment(),
-            Token::Call => self.func_call(),
+            Token::Let => {
+                self.assignment();
+            }
+            Token::Call => {
+                self.func_call();
+            }
             Token::If => {
                 self.if_statement();
-                -1
             }
             Token::While => {
                 self.while_statement();
-                -1
             }
             Token::Return => {
                 self.return_statement();
-                -1
             }
-            Token::Symbol(Symbol::CloseBrace)
-            | Token::Fi
-            | Token::While
-            | Token::Else
-            | Token::Od
-            | Token::Symbol(Symbol::CloseBrace) => -1,
+            Token::Symbol(Symbol::CloseBrace) | Token::Fi | Token::Else | Token::Od => (),
             _ => panic!("Error: Invalid Statement format: {}", self.current()),
         };
-
-        -1
     }
     fn stat_sequence(&mut self) {
         // assignment | funcCall | ifStatement | whileStatement | returnStatement
@@ -656,40 +650,6 @@ impl Parser {
         // println!("{:?}", self.block0.borrow());
     }
 
-    fn connect_next(&mut self, block_num: usize) {
-        let block = if let Some(b) = self.blocks.get(&block_num) {
-            b
-        } else {
-            panic!("Error: No Block Found at {}", block_num)
-        };
-        match self.blocks.get(&(self.blocks.len() - 1)) {
-            Some(last) => {
-                last.borrow_mut()
-                    .add_next(block.borrow().get_block_num() as usize);
-            }
-
-            _ => (),
-        };
-
-        // block
-    }
-
-    fn connect_prev(&mut self, block_num: usize) {
-        let block = if let Some(b) = self.blocks.get(&block_num) {
-            b
-        } else {
-            panic!("Error: No Block Found at {}", block_num)
-        };
-        match self.blocks.get(&1) {
-            Some(_) => {
-                block.borrow_mut().add_next(1);
-            }
-            _ => (),
-        };
-
-        // block
-    }
-
     fn connect(&mut self, front_num: usize, back_num: usize) {
         let mut front_block = if let Some(front) = self.blocks.get(&front_num) {
             front
@@ -702,18 +662,6 @@ impl Parser {
         front_block.borrow_mut().add_next(back_num as usize);
         // back.borrow_mut()
         //     .add_prev(front.borrow().get_block_num() as usize);
-    }
-
-    fn connect_prev_with_back(
-        &mut self,
-        block: RefCell<Block>,
-        back: RefCell<Block>,
-    ) -> (RefCell<Block>, RefCell<Block>) {
-        block
-            .borrow_mut()
-            .add_next(back.borrow().get_block_num() as usize);
-
-        (block, back)
     }
 
     // pub fn arithm(&mut self, op: Operator, x: &mut Result, y: &mut Result) {
