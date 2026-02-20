@@ -323,6 +323,10 @@ impl Parser {
         self.switch_block(then_key);
         self.stat_sequence(); // add all the instructions in the then to the then block
         self.connect(if_key, then_key);
+
+        // generate phis for then
+        let phis = self.generate_phi(if_key, then_key);
+
         if self.cur_block_num != then_key {
             self.connect(self.cur_block_num, fi_key);
         } else {
@@ -664,6 +668,18 @@ impl Parser {
         //     .add_prev(front.borrow().get_block_num() as usize);
     }
 
+    fn generate_phi(&mut self, pre_key: usize, now_key: usize) -> Vec<Operator> {
+        if let (Some(pre), Some(now)) = (self.blocks.get(&pre_key), self.blocks.get(&now_key)) {
+            let vars = pre.borrow().compare_table(now.clone());
+            let mut phis = Vec::new();
+            for (_, (pre_b, b)) in vars {
+                let phi = Operator::Phi(pre_b, b);
+                phis.push(phi);
+            }
+            return phis;
+        }
+        vec![]
+    }
     // pub fn arithm(&mut self, op: Operator, x: &mut Result, y: &mut Result) {
     //     let mut z = Result::new(Kind::Const, 0, 0, 0);
     //     if x.get_kind() == Kind::Const && y.get_kind() == Kind::Const {
