@@ -40,7 +40,7 @@ impl Parser {
         // let mut busy = vec![0; 32];
         // busy[0] = 1; // register 0
         let mut block0 = RefCell::new(Block::new(0, "block_".to_string(), HashMap::new()));
-        let zero_inst = Inst::new((0, Operator::Const(0)));
+        let zero_inst = Inst::new(0, Operator::Const(0));
         block0.borrow_mut().push_head(zero_inst);
         let mut blocks = BTreeMap::new();
         blocks.insert(
@@ -99,7 +99,7 @@ impl Parser {
                 if let Some(i_num) = self.insts.get(&op) {
                     return *i_num;
                 }
-                let new_num = Inst::new((inst_num, op.clone()));
+                let new_num = Inst::new(inst_num, op.clone());
                 self.block0.borrow_mut().push_tail(new_num);
                 self.insts.insert(op, inst_num);
                 println!("Num's Token: {}", self.current());
@@ -609,8 +609,7 @@ impl Parser {
     ///
     fn add_inst_to_tail(&mut self, op: Operator) -> i32 {
         self.total_inst += 1;
-        let data = (self.total_inst, op);
-        let new_inst = Inst::new(data);
+        let new_inst = Inst::new(self.total_inst, op);
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b
         } else {
@@ -622,8 +621,7 @@ impl Parser {
 
     fn add_inst_to_head(&mut self, op: Operator) -> i32 {
         self.total_inst += 1;
-        let data = (self.total_inst, op);
-        let new_inst = Inst::new(data);
+        let new_inst = Inst::new(self.total_inst, op);
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b
         } else {

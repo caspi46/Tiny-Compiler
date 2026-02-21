@@ -4,16 +4,18 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub struct Inst {
-    data: (i32, Operator),
+    inst_num: i32,
+    op: Operator,
 }
 
 impl<'a> Inst {
     pub fn new(
-        data: (i32, Operator),
+        inst_num: i32,
+        op: Operator,
         // prev: Option<*const Inst>,
         // next: Option<*const Inst>,
     ) -> Self {
-        Self { data }
+        Self { inst_num, op }
     }
 
     // pub fn set_next(&mut self, next_inst: &Inst) {
@@ -26,16 +28,16 @@ impl<'a> Inst {
     // }
 
     pub fn update_operator(&mut self, operator: Operator) {
-        self.data = (self.data.0, operator);
+        self.op = operator;
     }
 
     pub fn get_operator(self) -> Operator {
-        self.data.1
+        self.op
     }
     pub fn get_inst_num(self) -> i32 {
-        self.data.0
+        self.inst_num
     }
     pub fn get_data(self) -> (i32, Operator) {
-        self.data
+        (self.inst_num, self.op)
     }
 }
