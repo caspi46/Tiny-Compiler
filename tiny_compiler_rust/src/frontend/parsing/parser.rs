@@ -92,7 +92,8 @@ impl Parser {
             }
             Token::Number(num) => {
                 // add num value in block 0
-                let inst_num = -1 * self.block0.borrow_mut().get_inst_num();
+                self.total_inst += 1;
+                let inst_num = self.total_inst;
                 let op = Operator::Const(num);
                 self.move_token();
                 if let Some(i_num) = self.insts.get(&op) {
@@ -482,7 +483,7 @@ impl Parser {
         //     return;
         // }
         match self.current() {
-            Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), 0),
+            Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), -1),
             _ => return,
         };
         self.move_token();
@@ -490,12 +491,16 @@ impl Parser {
             self.move_token();
             // check if the token type is identifier (Ident)
             match self.current() {
-                Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), 0),
+                Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), -1),
                 _ => panic!("Error: Invalid VarDecl Format - Missing Variable Name after Comma"),
             };
+            self.move_token();
         }
         if self.current() != &Token::Symbol(Symbol::SemiColon) {
-            panic!("Error: Missing SemiColon: \";\"");
+            panic!(
+                "Error: Missing SemiColon: \";\"\nCurrent Token: {}",
+                self.current()
+            );
         }
     }
 
@@ -742,8 +747,12 @@ mod tests {
     fn calc_test1() {
         let input = String::from(
             "main
-        var a; {
+        var a, b, c; {
             let a <- 1;
+            let b <- 2; 
+            let a <- a + 1;
+            let c <- b + a - 2;
+            let a <- c / 2;
     }.",
         );
         let mut parse = Parser::new(input);
