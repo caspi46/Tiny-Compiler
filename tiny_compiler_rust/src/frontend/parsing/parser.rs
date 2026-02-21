@@ -39,7 +39,7 @@ impl Parser {
         // }
         // let mut busy = vec![0; 32];
         // busy[0] = 1; // register 0
-        let mut block0 = RefCell::new(Block::new(0, "block_".to_string(), HashMap::new()));
+        let block0 = RefCell::new(Block::new(0, "block_".to_string(), HashMap::new()));
         let zero_inst = Inst::new(0, Operator::Const(0));
         block0.borrow_mut().push_head(zero_inst);
         let mut blocks = BTreeMap::new();
@@ -92,21 +92,18 @@ impl Parser {
             }
             Token::Number(num) => {
                 // add num value in block 0
-                self.total_inst += 1;
-                let inst_num = self.total_inst;
+
                 let op = Operator::Const(num);
                 self.move_token();
                 if let Some(i_num) = self.insts.get(&op) {
                     return *i_num;
                 }
+                self.total_inst += 1;
+                let inst_num = self.total_inst;
                 let new_num = Inst::new(inst_num, op.clone());
                 self.block0.borrow_mut().push_tail(new_num);
                 self.insts.insert(op, inst_num);
                 println!("Num's Token: {}", self.current());
-                // match self.insts.get(&op) {
-                //     Some(inst_num) => println!("Num's inst#: {}", inst_num),
-                //     _ => println!("No inst# for Num {}", self.current()),
-                // };
                 return inst_num;
             }
             Token::Ident(UserDefined(var)) => {
@@ -154,8 +151,8 @@ impl Parser {
                 Token::Op(DIV) => Operator::Div(x, y),
                 _ => panic!("Error, Invalid Div or Mul"),
             };
-            self.add_inst_to_tail(op.clone());
-            self.insts.insert(op, self.total_inst);
+            let inst_num = self.add_inst_to_tail(op.clone());
+            self.insts.insert(op, inst_num);
             println!("end of the MUL&DIV loop : {}", self.current());
         }
         // should return i32
@@ -182,8 +179,8 @@ impl Parser {
                 Token::Op(SUB) => Operator::Sub(x, y),
                 _ => panic!("Error: Invalid ADD or SUB format"),
             };
-            self.add_inst_to_tail(op.clone());
-            self.insts.insert(op, self.total_inst);
+            let inst_num = self.add_inst_to_tail(op.clone());
+            self.insts.insert(op, inst_num);
         }
         self.total_inst // TODO: test if the return value is correct
         // return the i32 value for that takes the calculation for example: add (1) (2) -> (1)
@@ -627,7 +624,6 @@ impl Parser {
         } else {
             panic!("Error: No Block Found at {}", self.cur_block_num)
         };
-        cur_block.borrow_mut().push_head(new_inst);
         self.total_inst
     }
 
