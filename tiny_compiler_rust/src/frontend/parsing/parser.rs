@@ -323,12 +323,13 @@ impl Parser {
         self.connect(if_key, then_key);
 
         // generate phis for then
-        let phis = self.generate_phi(if_key, then_key);
-
+        let mut phis;
         if self.cur_block_num != then_key {
             self.connect(self.cur_block_num, fi_key);
+            phis = self.generate_phi(self.cur_block_num, then_key);
         } else {
             self.connect(then_key, fi_key);
+            phis = self.generate_phi(if_key, then_key);
         }
         // create phi functioins here for fi block (LEFT in Phi(Left, Right))
         // At this point Right should be the original inst#
@@ -346,12 +347,15 @@ impl Parser {
             // (if_block, else_block) = self.connect(if_block, else_block);
             self.blocks.insert(self.total_block, else_block);
             let else_key = self.total_block;
+            self.connect(if_key, else_key);
             self.switch_block(else_key);
             self.stat_sequence();
             if self.cur_block_num != else_key {
                 self.connect(self.cur_block_num, fi_key);
+                phis = self.generate_phi(self.cur_block_num, else_key);
             } else {
                 self.connect(else_key, fi_key);
+                phis = self.generate_phi(then_key, else_key);
             }
             // update phi functions here for fi block
             // TODO: identify which variable is updated
@@ -367,6 +371,10 @@ impl Parser {
         }
 
         self.switch_block(fi_key);
+        for (var, phi) in phis {
+            let inst_num = self.add_inst_to_tail(phi);
+            self.update_table(var, inst_num);
+        }
         self.move_token();
         // add phi functions if exists
     }
@@ -624,6 +632,7 @@ impl Parser {
         } else {
             panic!("Error: No Block Found at {}", self.cur_block_num)
         };
+        cur_block.borrow_mut().push_head(new_inst);
         self.total_inst
     }
 
@@ -653,6 +662,13 @@ impl Parser {
         // println!("{:?}", self.block0.borrow());
     }
 
+    fn update_table(&mut self, var: String, inst_num: i32) {
+        if let Some(b) = self.blocks.get(&self.cur_block_num) {
+            b.borrow_mut().update_table(var.clone(), inst_num);
+            self.vars.insert(var, inst_num);
+        }
+    }
+
     fn connect(&mut self, front_num: usize, back_num: usize) {
         let mut front_block = if let Some(front) = self.blocks.get(&front_num) {
             front
@@ -667,13 +683,14 @@ impl Parser {
         //     .add_prev(front.borrow().get_block_num() as usize);
     }
 
-    fn generate_phi(&mut self, pre_key: usize, now_key: usize) -> Vec<Operator> {
+    fn generate_phi(&mut self, pre_key: usize, now_key: usize) -> Vec<(String, Operator)> {
         if let (Some(pre), Some(now)) = (self.blocks.get(&pre_key), self.blocks.get(&now_key)) {
-            let vars = pre.borrow().compare_table(now.clone());
+            let vars = pre.borrow().compare_table(now);
             let mut phis = Vec::new();
-            for (_, (pre_b, b)) in vars {
-                let phi = Operator::Phi(pre_b, b);
-                phis.push(phi);
+            for (var, (pre_b, b)) in vars {
+                self.total_inst += 1;
+                let phi_inst = Operator::Phi(pre_b, b);
+                phis.push((var, phi_inst));
             }
             return phis;
         }
@@ -833,10 +850,11 @@ fi
                 if 1 == 2 then
                     let a <- a - 1;
                 fi;
-    else if 1 == 3 then let a <- a - 1; fi;
-    let a <- 67 + 67;
-fi;
-let a <- 2;
+                else 
+                    if 1 == 3 then let a <- a - 1; fi;
+                let a <- 67 + 67;
+            fi;
+        let a <- 2;
     }.",
         );
         let mut parse = Parser::new(input);

@@ -106,7 +106,7 @@ impl<'a> Block {
         self.table.get(ident)
     }
 
-    pub fn compare_table(&self, other: RefCell<Block>) -> HashMap<String, (i32, i32)> {
+    pub fn compare_table(&self, other: &RefCell<Block>) -> HashMap<String, (i32, i32)> {
         let mut updated_vars = HashMap::new();
         for (var, inst_n) in self.table.clone() {
             if let Some(i) = other.borrow().check_table(&var) {
