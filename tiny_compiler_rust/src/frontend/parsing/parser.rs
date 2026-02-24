@@ -16,7 +16,7 @@ use std::sync::Arc;
 pub struct Parser {
     tokens: Vec<Token>,
     blocks: BTreeMap<usize, RefCell<Block>>,
-    vars: HashMap<String, i32>,
+    vars: HashMap<String, Option<i32>>,
     insts: HashMap<Operator, i32>,
     funcs: HashMap<Token, Vec<Token>>,
     cur_token_index: usize,
@@ -100,7 +100,7 @@ impl Parser {
                 }
                 self.total_inst += 1;
                 let inst_num = self.total_inst;
-                let new_num = Inst::new(inst_num, op.clone());
+                let new_num = Inst::new(inst_num * (-1), op.clone());
                 self.block0.borrow_mut().push_tail(new_num);
                 self.insts.insert(op, inst_num);
                 println!("Num's Token: {}", self.current());
@@ -117,7 +117,7 @@ impl Parser {
                     panic!("Error: No Block Found at {}", self.total_block)
                 };
 
-                if let Some(&inst_num) = cur_block.borrow().check_table(&var) {
+                if let Some(inst_num) = cur_block.borrow().check_table(&var) {
                     return inst_num;
                 }
                 panic!("Error: Invalid factor, using the uninitialized variable");
@@ -134,7 +134,7 @@ impl Parser {
     }
     fn term(&mut self) -> i32 {
         // factor { ("*" | "/") factor }
-        let x = self.factor();
+        let x: i32 = self.factor();
         // self.vars.insert(x, self.total_inst);
         println!("Current token after Factor: {}", self.current());
         if self.current() != &Token::Op(MUL) && self.current() != &Token::Op(DIV) {
@@ -193,47 +193,21 @@ impl Parser {
         // while matches!(self.current(), &Token::RelOp(_)) {
         print!("Current Token after LHS in relation: {}", self.current());
         // }
-        match self.current() {
-            &Token::RelOp(EQ) => {
-                let rhs = self.expression();
-                let cmp_inst = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
-                let eq_inst = self.add_inst_to_tail(Operator::Beq(lhs, rhs));
-                (cmp_inst, eq_inst)
-            }
-            &Token::RelOp(NE) => {
-                let rhs = self.expression();
-                let cmp_inst = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
-                let ne_inst = self.add_inst_to_tail(Operator::Bne(lhs, rhs));
-                (cmp_inst, ne_inst)
-            }
-            &Token::RelOp(GT) => {
-                let rhs = self.expression();
-                let cmp_inst = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
-                let gt_inst = self.add_inst_to_tail(Operator::Bgt(lhs, rhs));
-                (cmp_inst, gt_inst)
-            }
-            &Token::RelOp(LT) => {
-                let rhs = self.expression();
-                let cmp_inst = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
-                let lt_inst = self.add_inst_to_tail(Operator::Blt(lhs, rhs));
-                (cmp_inst, lt_inst)
-            }
-            &Token::RelOp(GE) => {
-                let rhs = self.expression();
-                let cmp_inst = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
-                let ge_inst = self.add_inst_to_tail(Operator::Bge(lhs, rhs));
-                (cmp_inst, ge_inst)
-            }
-            &Token::RelOp(LE) => {
-                let rhs = self.expression();
-                let cmp_inst = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
-                let le_inst = self.add_inst_to_tail(Operator::Blt(lhs, rhs));
-                (cmp_inst, le_inst)
-            }
+        let rhs = self.expression();
+        let cmp_inst = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
+        let rel_inst = match self.current() {
+            &Token::RelOp(EQ) => self.add_inst_to_tail(Operator::Beq(lhs, rhs)),
+            &Token::RelOp(NE) => self.add_inst_to_tail(Operator::Bne(lhs, rhs)),
+            &Token::RelOp(GT) => self.add_inst_to_tail(Operator::Bgt(lhs, rhs)),
+
+            &Token::RelOp(LT) => self.add_inst_to_tail(Operator::Blt(lhs, rhs)),
+            &Token::RelOp(GE) => self.add_inst_to_tail(Operator::Bge(lhs, rhs)),
+            &Token::RelOp(LE) => self.add_inst_to_tail(Operator::Blt(lhs, rhs)),
             _ => {
                 panic!("Error, missing relOp: ==, !=, >, <, >=, <=");
             }
-        }
+        };
+        (cmp_inst, rel_inst)
     }
     fn assignment(&mut self) -> i32 {
         // "let" ident "<-"  expression
@@ -249,7 +223,7 @@ impl Parser {
         }
         println!("Current token before expression: {}", self.current());
         let rhs = self.expression(); // TODO: Return value (Identify the value)
-        self.vars.insert(var.clone(), rhs);
+        self.vars.insert(var.clone(), Some(rhs));
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b
         } else {
@@ -421,16 +395,18 @@ impl Parser {
         }
         self.switch_block(do_num);
         self.stat_sequence();
+        let phis;
         if self.cur_block_num == do_num {
             self.connect(do_num, while_num);
+            phis = self.generate_phi(while_num, do_num);
         } else {
             self.connect(self.cur_block_num, while_num);
+            phis = self.generate_phi(while_num, self.cur_block_num);
         }
         if self.current() != &Token::Od {
             panic!("Error: Invalid While Statement Format, Missing \"od\"");
         }
         self.switch_block(od_num);
-        self.connect(od_num, while_num);
         self.move_token();
     }
     fn return_statement(&mut self) {
@@ -488,7 +464,7 @@ impl Parser {
         //     return;
         // }
         match self.current() {
-            Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), -1),
+            Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), None),
             _ => return,
         };
         self.move_token();
@@ -496,7 +472,7 @@ impl Parser {
             self.move_token();
             // check if the token type is identifier (Ident)
             match self.current() {
-                Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), -1),
+                Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), None),
                 _ => panic!("Error: Invalid VarDecl Format - Missing Variable Name after Comma"),
             };
             self.move_token();
@@ -665,7 +641,7 @@ impl Parser {
     fn update_table(&mut self, var: String, inst_num: i32) {
         if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b.borrow_mut().update_table(var.clone(), inst_num);
-            self.vars.insert(var, inst_num);
+            self.vars.insert(var, Some(inst_num));
         }
     }
 
@@ -888,7 +864,7 @@ fi
             "main
         var a; {
         let a <- 1;
-            while 1 == 2 do
+            while 1 == a do
                 
                     let a <- a - 1;
                 od

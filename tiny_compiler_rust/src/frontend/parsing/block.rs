@@ -23,12 +23,12 @@ pub struct Block {
     block_name: String,
     block_num: usize,
     insts: VecDeque<Inst>,
-    table: HashMap<String, i32>,
+    table: HashMap<String, Option<i32>>,
     nexts: Vec<usize>,
 }
 
 impl<'a> Block {
-    pub fn new(cur_num: usize, name: String, table: HashMap<String, i32>) -> Self {
+    pub fn new(cur_num: usize, name: String, table: HashMap<String, Option<i32>>) -> Self {
         let block_name = name + &cur_num.to_string();
 
         Self {
@@ -96,22 +96,25 @@ impl<'a> Block {
     /// update_table
     /// update the ident's information in the table
     pub fn update_table(&mut self, ident: String, inst_num: i32) {
-        self.table.insert(ident, inst_num);
+        self.table.insert(ident, Some(inst_num));
     }
 
     /// check_table
     /// check if the ident exists in the table
     /// if so, return the inst#
-    pub fn check_table(&self, ident: &String) -> Option<&i32> {
-        self.table.get(ident)
+    pub fn check_table(&self, ident: &String) -> Option<i32> {
+        match self.table.get(ident) {
+            Some(&val) => val,
+            _ => None,
+        }
     }
 
     pub fn compare_table(&self, other: &RefCell<Block>) -> HashMap<String, (i32, i32)> {
         let mut updated_vars = HashMap::new();
         for (var, inst_n) in self.table.clone() {
-            if let Some(i) = other.borrow().check_table(&var) {
-                if inst_n != *i {
-                    updated_vars.insert(var, (inst_n, *i));
+            if let (Some(i), Some(inst_n)) = (other.borrow().check_table(&var), inst_n) {
+                if inst_n != i {
+                    updated_vars.insert(var, (inst_n, i));
                 }
             }
         }
