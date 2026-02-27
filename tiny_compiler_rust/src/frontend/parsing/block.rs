@@ -5,6 +5,7 @@ use crate::frontend::fsm::token::{Ident, Token};
 use crate::frontend::operators::{inst::Inst, operator::Operator};
 use std::cell::{Ref, RefCell};
 use std::collections::{BTreeMap, HashMap, VecDeque};
+
 // use std::cell::RefCell;
 // use std::rc::Rc;
 
@@ -123,6 +124,47 @@ impl<'a> Block {
 
     pub fn get_block_num(&self) -> usize {
         self.block_num
+    }
+
+    pub fn get_inst(&self, op: &Operator) -> Option<i32> {
+        for inst in &self.insts {
+            let (n, o) = inst.clone().get_data();
+            if o == *op {
+                return Some(n);
+            }
+        }
+        return None;
+    }
+
+    pub fn set_pair_for_phi(&self, phis: Vec<(String, i32)>) -> HashMap<i32, i32> {
+        let mut pair = HashMap::new();
+        for (v, n) in phis {
+            if let Some(k) = self.table.get(&v) {
+                if let Some(original) = k {
+                    pair.insert(*original, n);
+                }
+            }
+        }
+        pair
+    }
+
+    pub fn update_inst(&mut self, phis: Vec<(String, i32)>) {
+        let ori_to_new = self.set_pair_for_phi(phis);
+
+        for i in 0..self.insts.len() {
+            let mut inst = self.insts[i].clone();
+            if let (Some(a), Some(b)) = &inst.clone().get_op_data() {
+                let new_a = match ori_to_new.get(&a) {
+                    Some(new_a) => *new_a,
+                    _ => *a,
+                };
+                let new_b = match ori_to_new.get(&b) {
+                    Some(new_b) => *new_b,
+                    _ => *b,
+                };
+                inst.update_op_insts(new_a, new_b);
+            }
+        }
     }
 
     // pub fn fill_in_table(&mut self, ident: Ident, inst_num: i32) {

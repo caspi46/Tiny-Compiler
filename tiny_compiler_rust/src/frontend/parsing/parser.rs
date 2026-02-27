@@ -95,15 +95,15 @@ impl Parser {
 
                 let op = Operator::Const(num);
                 self.move_token();
-                if let Some(i_num) = self.insts.get(&op) {
-                    return *i_num;
+                if let Some(i_num) = self.block0.borrow().get_inst(&op) {
+                    return i_num;
                 }
                 self.total_inst += 1;
-                let inst_num = self.total_inst;
-                let new_num = Inst::new(inst_num * (-1), op.clone());
+                let inst_num = self.total_inst * (-1);
+                let new_num = Inst::new(inst_num, op.clone());
                 self.block0.borrow_mut().push_tail(new_num);
                 self.insts.insert(op, inst_num);
-                println!("Num's Token: {}", self.current());
+                println!("Num's Token: {}", inst_num);
                 return inst_num;
             }
             Token::Ident(UserDefined(var)) => {
@@ -187,22 +187,24 @@ impl Parser {
     }
     fn relation(&mut self) -> (i32, i32) {
         // should return
-        // // expression relOp expression
+        // // expression relOp expression]
+        // self.move_token();
         println!("Current Token in Relation: {}", self.current());
         let lhs = self.expression(); // first in RelOp (v1, v2)
         // while matches!(self.current(), &Token::RelOp(_)) {
         print!("Current Token after LHS in relation: {}", self.current());
         // }
+        let rel_op = self.current().clone();
         let rhs = self.expression();
         let cmp_inst = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
-        let rel_inst = match self.current() {
-            &Token::RelOp(EQ) => self.add_inst_to_tail(Operator::Beq(lhs, rhs)),
-            &Token::RelOp(NE) => self.add_inst_to_tail(Operator::Bne(lhs, rhs)),
-            &Token::RelOp(GT) => self.add_inst_to_tail(Operator::Bgt(lhs, rhs)),
+        let rel_inst = match rel_op {
+            Token::RelOp(EQ) => self.add_inst_to_tail(Operator::Beq(lhs, rhs)),
+            Token::RelOp(NE) => self.add_inst_to_tail(Operator::Bne(lhs, rhs)),
+            Token::RelOp(GT) => self.add_inst_to_tail(Operator::Bgt(lhs, rhs)),
 
-            &Token::RelOp(LT) => self.add_inst_to_tail(Operator::Blt(lhs, rhs)),
-            &Token::RelOp(GE) => self.add_inst_to_tail(Operator::Bge(lhs, rhs)),
-            &Token::RelOp(LE) => self.add_inst_to_tail(Operator::Blt(lhs, rhs)),
+            Token::RelOp(LT) => self.add_inst_to_tail(Operator::Blt(lhs, rhs)),
+            Token::RelOp(GE) => self.add_inst_to_tail(Operator::Bge(lhs, rhs)),
+            Token::RelOp(LE) => self.add_inst_to_tail(Operator::Blt(lhs, rhs)),
             _ => {
                 panic!("Error, missing relOp: ==, !=, >, <, >=, <=");
             }
@@ -223,7 +225,11 @@ impl Parser {
         }
         println!("Current token before expression: {}", self.current());
         let rhs = self.expression(); // TODO: Return value (Identify the value)
-        self.vars.insert(var.clone(), Some(rhs));
+        if rhs > 0 {
+            self.vars.insert(var.clone(), Some(rhs));
+        } else {
+            self.vars.insert(var.clone(), Some(rhs * (-1)));
+        }
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b
         } else {
@@ -285,6 +291,7 @@ impl Parser {
 
         // add insts in if block
         self.switch_block(if_key);
+        // self.move_token();
         let (cmp, cond) = self.relation(); // if_block saved them already
         println!("Current Token after IF: {}", self.current());
 
@@ -406,6 +413,14 @@ impl Parser {
         if self.current() != &Token::Od {
             panic!("Error: Invalid While Statement Format, Missing \"od\"");
         }
+
+        let mut var_to_inst = Vec::new();
+        for (var, op) in phis {
+            let inst_num = self.add_inst_to_head(op);
+            var_to_inst.push((var, inst_num));
+        }
+        self.switch_block(while_num);
+        self.update_by_phi(var_to_inst);
         self.switch_block(od_num);
         self.move_token();
     }
@@ -671,6 +686,12 @@ impl Parser {
             return phis;
         }
         vec![]
+    }
+
+    fn update_by_phi(&mut self, phis: Vec<(String, i32)>) {
+        if let Some(block) = self.blocks.get(&self.cur_block_num) {
+            block.borrow_mut().update_inst(phis);
+        }
     }
     // pub fn arithm(&mut self, op: Operator, x: &mut Result, y: &mut Result) {
     //     let mut z = Result::new(Kind::Const, 0, 0, 0);
