@@ -225,17 +225,18 @@ impl Parser {
         }
         println!("Current token before expression: {}", self.current());
         let rhs = self.expression(); // TODO: Return value (Identify the value)
-        if rhs > 0 {
-            self.vars.insert(var.clone(), Some(rhs));
+        let updated_rhs = if rhs > 0 {
+            rhs
         } else {
-            self.vars.insert(var.clone(), Some(rhs * (-1)));
-        }
+            rhs * (-1)
+        };
+        self.vars.insert(var.clone(), Some(updated_rhs));
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b
         } else {
             panic!("Error: No Block Found at {}", self.cur_block_num)
         };
-        cur_block.borrow_mut().update_table(var, rhs);
+        cur_block.borrow_mut().update_table(var, updated_rhs);
         rhs
     }
 
@@ -381,19 +382,10 @@ impl Parser {
         ));
         self.blocks.insert(self.total_block, do_block);
 
-        self.total_block += 1;
-        let od_num = self.total_block;
-        let od_block = RefCell::new(Block::new(
-            self.total_block,
-            "od_".to_string(),
-            before_table.clone(),
-        ));
-        self.blocks.insert(self.total_block, od_block);
-
         // Edges
         self.connect(self.cur_block_num, while_num);
         self.connect(while_num, do_num);
-        self.connect(while_num, od_num);
+        
 
         self.switch_block(while_num);
         self.relation(); // TODO: Return Value 
@@ -421,6 +413,16 @@ impl Parser {
         }
         self.switch_block(while_num);
         self.update_by_phi(var_to_inst);
+        self.total_block += 1;
+        let od_num = self.total_block;
+        let od_block = RefCell::new(Block::new(
+            self.total_block,
+            "od_".to_string(),
+            before_table.clone(),
+        ));
+        self.blocks.insert(self.total_block, od_block);
+        self.connect(while_num, od_num);
+
         self.switch_block(od_num);
         self.move_token();
     }
