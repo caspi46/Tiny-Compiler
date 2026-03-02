@@ -65,6 +65,11 @@ impl<'a> Block {
         &self.insts[self.insts.len()]
     }
 
+    /// get_table
+    /// get the table
+    pub fn get_table(&self) -> HashMap<String, Option<i32>> {
+        self.table.clone()
+    }
     /// push_head
     /// add inst to the front of the block
     pub fn push_head(&mut self, new_head: Inst) {
@@ -98,6 +103,12 @@ impl<'a> Block {
     /// update the ident's information in the table
     pub fn update_table(&mut self, ident: String, inst_num: i32) {
         self.table.insert(ident, Some(inst_num));
+    }
+
+    pub fn update_table_with_insts(&mut self, var_to_phi: &HashMap<String, i32>) {
+        for (var, phi) in var_to_phi {
+            self.table.insert(var.clone(), Some(*phi));
+        }
     }
 
     /// check_table
@@ -136,22 +147,24 @@ impl<'a> Block {
         return None;
     }
 
-    pub fn set_pair_for_phi(&self, phis: Vec<(String, i32)>) -> HashMap<i32, i32> {
+    pub fn set_pair_for_phi(&mut self, phis: &Vec<(String, i32)>) -> HashMap<i32, i32> {
         let mut pair = HashMap::new();
         for (v, n) in phis {
-            if let Some(k) = self.table.get(&v) {
+            if let Some(k) = self.table.get(v) {
                 if let Some(original) = k {
-                    pair.insert(*original, n);
+                    pair.insert(*original, *n);
+                    self.table.insert(v.clone(), Some(*n));
                 }
             }
         }
         pair
     }
 
-    pub fn update_inst(&mut self, phis: Vec<(String, i32)>) {
-        let ori_to_new = self.set_pair_for_phi(phis);
-
+    pub fn update_inst(&mut self, ori_to_new: &HashMap<i32, i32>) {
+        println!("Current Table for update Inst: {}", self.block_name);
+        // println!("Current ori_to_new: {:?}", ori_to_new);
         for i in 0..self.insts.len() {
+            println!("Current i for update Inst: {}", i);
             let mut inst = self.insts[i].clone();
             if let (Some(a), Some(b)) = &inst.clone().get_op_data() {
                 let new_a = match ori_to_new.get(&a) {
@@ -164,6 +177,7 @@ impl<'a> Block {
                 };
                 inst.update_op_insts(new_a, new_b);
             }
+            self.insts[i] = inst;
         }
     }
 

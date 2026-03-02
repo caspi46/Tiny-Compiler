@@ -225,11 +225,7 @@ impl Parser {
         }
         println!("Current token before expression: {}", self.current());
         let rhs = self.expression(); // TODO: Return value (Identify the value)
-        let updated_rhs = if rhs > 0 {
-            rhs
-        } else {
-            rhs * (-1)
-        };
+        let updated_rhs = if rhs > 0 { rhs } else { rhs * (-1) };
         self.vars.insert(var.clone(), Some(updated_rhs));
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b
@@ -354,7 +350,8 @@ impl Parser {
 
         self.switch_block(fi_key);
         for (var, phi) in phis {
-            let inst_num = self.add_inst_to_tail(phi);
+            let phi_op = Operator::Phi(phi.0, phi.1);
+            let inst_num = self.add_inst_to_tail(phi_op);
             self.update_table(var, inst_num);
         }
         self.move_token();
@@ -385,7 +382,6 @@ impl Parser {
         // Edges
         self.connect(self.cur_block_num, while_num);
         self.connect(while_num, do_num);
-        
 
         self.switch_block(while_num);
         self.relation(); // TODO: Return Value 
@@ -405,21 +401,40 @@ impl Parser {
         if self.current() != &Token::Od {
             panic!("Error: Invalid While Statement Format, Missing \"od\"");
         }
-
-        let mut var_to_inst = Vec::new();
-        for (var, op) in phis {
-            let inst_num = self.add_inst_to_head(op);
-            var_to_inst.push((var, inst_num));
-        }
+        // phi instructions
         self.switch_block(while_num);
-        self.update_by_phi(var_to_inst);
+        let mut ori_to_new = HashMap::new();
+        let mut var_to_phi = HashMap::new();
+        let mut phi_insts = Vec::new();
+        // let mut choices = Vec::new();
+        for (var, phi) in phis {
+            self.total_inst += 1;
+            let phi_op = Operator::Phi(phi.0, phi.1);
+            let phi_inst = Inst::new(self.total_inst, phi_op);
+            ori_to_new.insert(phi.0, self.total_inst);
+            var_to_phi.insert(var, self.total_inst);
+            phi_insts.push(phi_inst);
+        }
+        // update instruction based on phi
+        self.update_by_phi(ori_to_new, while_num);
+        self.update_table_with_insts(var_to_phi, while_num);
+        for inst in phi_insts {
+            let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
+                b
+            } else {
+                panic!("Error: No Block Found at {}", self.cur_block_num)
+            };
+            cur_block.borrow_mut().push_head(inst);
+        }
+
         self.total_block += 1;
         let od_num = self.total_block;
         let od_block = RefCell::new(Block::new(
             self.total_block,
             "od_".to_string(),
-            before_table.clone(),
+            self.get_table_from_block(while_num),
         ));
+
         self.blocks.insert(self.total_block, od_block);
         self.connect(while_num, od_num);
 
@@ -676,13 +691,13 @@ impl Parser {
         //     .add_prev(front.borrow().get_block_num() as usize);
     }
 
-    fn generate_phi(&mut self, pre_key: usize, now_key: usize) -> Vec<(String, Operator)> {
+    fn generate_phi(&mut self, pre_key: usize, now_key: usize) -> Vec<(String, (i32, i32))> {
         if let (Some(pre), Some(now)) = (self.blocks.get(&pre_key), self.blocks.get(&now_key)) {
             let vars = pre.borrow().compare_table(now);
             let mut phis = Vec::new();
             for (var, (pre_b, b)) in vars {
                 self.total_inst += 1;
-                let phi_inst = Operator::Phi(pre_b, b);
+                let phi_inst = (pre_b, b);
                 phis.push((var, phi_inst));
             }
             return phis;
@@ -690,10 +705,34 @@ impl Parser {
         vec![]
     }
 
-    fn update_by_phi(&mut self, phis: Vec<(String, i32)>) {
-        if let Some(block) = self.blocks.get(&self.cur_block_num) {
-            block.borrow_mut().update_inst(phis);
+    fn update_by_phi(&mut self, phis: HashMap<i32, i32>, start_key: usize) {
+        println!("Update By Phi");
+        println!(
+            "start key: {}\ntotal_block: {}",
+            start_key, self.total_block
+        );
+        for i in start_key..self.total_block + 1 {
+            println!("Current i: {}", i);
+            if let Some(block) = self.blocks.get(&i) {
+                block.borrow_mut().update_inst(&phis);
+            }
         }
+    }
+
+    fn update_table_with_insts(&mut self, var_to_phi: HashMap<String, i32>, start_key: usize) {
+        for i in start_key..self.total_block + 1 {
+            println!("Current i: {}", i);
+            if let Some(block) = self.blocks.get(&i) {
+                block.borrow_mut().update_table_with_insts(&var_to_phi);
+            }
+        }
+    }
+
+    fn get_table_from_block(&self, key: usize) -> HashMap<String, Option<i32>> {
+        if let Some(block) = self.blocks.get(&key) {
+            return block.borrow().get_table();
+        }
+        HashMap::new()
     }
     // pub fn arithm(&mut self, op: Operator, x: &mut Result, y: &mut Result) {
     //     let mut z = Result::new(Kind::Const, 0, 0, 0);
@@ -868,10 +907,11 @@ fi
             "main
         var a; {
         let a <- 1;
-            while 1 == 2 do
-                while 1 == 2 do 
+            while 1 == a do
+                while 1 == a do 
                     let a <- a - 1;
-                od
+                od;
+            let a <- a + 1;
             od
     }.",
         );
