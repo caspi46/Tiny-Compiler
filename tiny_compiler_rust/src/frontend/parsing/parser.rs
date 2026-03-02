@@ -248,9 +248,9 @@ impl Parser {
         // "call" ident [ "(" [expression {"," expression}] ")"]
         // self.move_token();
         match self.current() {
-            Token::Ident(ident) | Token::Ident(ident) => {
+            Token::Ident(Ident::InputNum) | Token::Ident(Ident::OutputNewLine) => {
                 // no parameter
-                let op = if ident == &Ident::InputNum {
+                let op = if self.current() == &Token::Ident(Ident::InputNum) {
                     Operator::Read
                 } else {
                     Operator::WriteNL
@@ -272,15 +272,18 @@ impl Parser {
             Token::Ident(Ident::OutputNum) => {
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) == self.current() {
-                    self.move_token();
-
+                    let arg = self.expression();
                     if &Token::Symbol(Symbol::CloseParen) != self.current() {
-                        panic!("Error: no closed parenthesis");
+                        panic!("Error: no closed parenthesis: {}", self.current());
                     }
+                    self.total_inst += 1;
+                    let write_op = Operator::Write(arg);
+                    self.insts.insert(write_op, self.total_inst);
+                    self.move_token();
+                    self.total_inst
                 } else {
                     panic!("Errorr: no opened parenthesis");
                 }
-                -1
             }
             Token::Ident(UserDefined(func)) => -1,
             _ => panic!("Error: Invalid funcCall format"),
@@ -887,6 +890,7 @@ mod tests {
         var a; {
             let a <- call InputNum();
             call OutputNewLine();
+            call OutputNum(a);
     }.",
         );
         let mut parse = Parser::new(input);
