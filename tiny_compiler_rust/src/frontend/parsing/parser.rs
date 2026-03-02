@@ -18,7 +18,7 @@ pub struct Parser {
     blocks: BTreeMap<usize, RefCell<Block>>,
     vars: HashMap<String, Option<i32>>,
     insts: HashMap<Operator, i32>,
-    funcs: HashMap<Token, Vec<Token>>,
+    funcs: HashMap<String, Vec<Token>>,
     cur_token_index: usize,
     // cur_block: &'a RefCell<Block>,
     cur_block_num: usize,
@@ -167,7 +167,7 @@ impl Parser {
         self.total_inst
     }
     fn expression(&mut self) -> i32 {
-        // term { ("+" | "-") terrm }
+        // term { ("+" | "-") term }
         let x = self.term(); // return the 
         // no add or sub calculation
         // gets the same inst# as term
@@ -264,8 +264,8 @@ impl Parser {
                     panic!("Error: no closed parenthesis");
                 }
 
-                self.total_inst += 1;
-                self.insts.insert(op, self.total_inst);
+                let inst_num = self.add_inst_to_tail(op.clone());
+                self.insts.insert(op, inst_num);
                 self.move_token();
                 self.total_inst
             }
@@ -276,16 +276,67 @@ impl Parser {
                     if &Token::Symbol(Symbol::CloseParen) != self.current() {
                         panic!("Error: no closed parenthesis: {}", self.current());
                     }
-                    self.total_inst += 1;
+
                     let write_op = Operator::Write(arg);
-                    self.insts.insert(write_op, self.total_inst);
+                    let inst_num = self.add_inst_to_tail(write_op.clone());
+                    self.insts.insert(write_op, inst_num);
                     self.move_token();
                     self.total_inst
                 } else {
                     panic!("Errorr: no opened parenthesis");
                 }
             }
-            Token::Ident(UserDefined(func)) => -1,
+            Token::Ident(UserDefined(func)) => {
+                let func_call = Operator::Jsr(func.clone());
+                let params = if let Some(p) = self.funcs.get(func) {
+                    p.len()
+                } else {
+                    panic!("Error: Invalid Function Format")
+                };
+                self.move_token();
+                if &Token::Symbol(Symbol::OpenParen) == self.current() {
+                    if params >= 1 {
+                        let param1 = self.expression();
+                        let set_param1 = Operator::SetPar1(param1);
+                        let inst_num = self.add_inst_to_tail(set_param1.clone());
+                        self.insts.insert(set_param1, inst_num);
+
+                        self.move_token();
+                        if self.current() != &Token::Symbol(Symbol::Comma) {
+                            panic!("Error: Missing Comma for Parameter in FuncCall");
+                        }
+                    }
+                    if params >= 2 {
+                        self.move_token();
+                        let param2 = self.expression();
+                        let set_param2 = Operator::SetPar2(param2);
+                        let inst_num = self.add_inst_to_tail(set_param2.clone());
+                        self.insts.insert(set_param2, inst_num);
+                        if self.current() != &Token::Symbol(Symbol::Comma) {
+                            panic!("Error: Missing Comma for Parameter in FuncCall");
+                        }
+                    }
+                    if params == 3 {
+                        self.move_token();
+                        let param3 = self.expression();
+                        let set_param3 = Operator::SetPar2(param3);
+                        let inst_num = self.add_inst_to_tail(set_param3.clone());
+                        self.insts.insert(set_param3, inst_num);
+                    }
+                    if params > 3 {
+                        panic!("Error: More than 3 Parameter for Function");
+                    }
+                    self.move_token();
+                    if &Token::Symbol(Symbol::CloseParen) != self.current() {
+                        panic!("Error: Missing Closed Parenthesis for function call");
+                    }
+                    let inst_num = self.add_inst_to_tail(func_call.clone());
+                    self.insts.insert(func_call, inst_num);
+                    self.total_inst
+                } else {
+                    panic!("Error: Missing Opened Paranthesis");
+                }
+            }
             _ => panic!("Error: Invalid funcCall format"),
         }
     }
@@ -571,7 +622,10 @@ impl Parser {
         if !matches!(self.current(), &Token::Ident(_)) {
             panic!("Error: Missing function name: Ident(_)");
         }
-        let func = self.current().clone();
+        let func = match self.current() {
+            Token::Ident(Ident::UserDefined(f)) => f.clone(),
+            _ => panic!("error: Invalid Function name"),
+        };
         let params = self.formal_param();
         self.funcs.insert(func, params);
         if self.current() == &Token::Symbol(Symbol::SemiColon) {
