@@ -155,6 +155,7 @@ impl<'a> Inst {
             Operator::SetPar1(_) => Some(Operator::SetPar1(updated)),
             Operator::SetPar2(_) => Some(Operator::SetPar2(updated)),
             Operator::SetPar3(_) => Some(Operator::SetPar3(updated)),
+            Operator::Write(_) => Some(Operator::Write(updated)),
             _ => None,
         };
 

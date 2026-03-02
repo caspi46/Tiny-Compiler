@@ -1,7 +1,7 @@
 use crate::frontend::fsm::{
     token::{
-        Ident::UserDefined, Op::ADD, Op::DIV, Op::MUL, Op::SUB, RelOp::EQ, RelOp::GE, RelOp::GT,
-        RelOp::LE, RelOp::LT, RelOp::NE, Symbol, Token, Token::Ident,
+        Ident, Ident::UserDefined, Op::ADD, Op::DIV, Op::MUL, Op::SUB, RelOp::EQ, RelOp::GE,
+        RelOp::GT, RelOp::LE, RelOp::LT, RelOp::NE, Symbol, Token,
     },
     tokenizer::Tokenizer,
 };
@@ -124,8 +124,15 @@ impl Parser {
             }
             Token::Call => {
                 // skip for now (maybe after I solve the ident and num)
-                let inst_num = self.func_call();
-                return inst_num; // Should call funcCall 
+                println!("Factor is Call");
+                self.move_token();
+                match self.current() {
+                    Token::Ident(Ident::InputNum) => {
+                        let inst_num = self.func_call();
+                        return inst_num; // Should call funcCall 
+                    }
+                    _ => panic!("The RHS function does not return a value"),
+                }
             }
             _ => {
                 panic!("Error: Invalid factor format: {}", self.current());
@@ -225,6 +232,7 @@ impl Parser {
         }
         println!("Current token before expression: {}", self.current());
         let rhs = self.expression(); // TODO: Return value (Identify the value)
+
         let updated_rhs = if rhs > 0 { rhs } else { rhs * (-1) };
         self.vars.insert(var.clone(), Some(updated_rhs));
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
@@ -238,15 +246,45 @@ impl Parser {
 
     fn func_call(&mut self) -> i32 {
         // "call" ident [ "(" [expression {"," expression}] ")"]
-        self.move_token();
+        // self.move_token();
         match self.current() {
-            Token::Ident(InputNum) => (),
-            Token::Ident(OutputNum) => (),
-            Token::Ident(OutputNewLine) => (),
-            Token::Ident(UserDefined(func)) => (),
+            Token::Ident(ident) | Token::Ident(ident) => {
+                // no parameter
+                let op = if ident == &Ident::InputNum {
+                    Operator::Read
+                } else {
+                    Operator::WriteNL
+                };
+                self.move_token();
+                if &Token::Symbol(Symbol::OpenParen) != self.current() {
+                    panic!("Error: no open parenthesis for function call");
+                }
+                self.move_token();
+                if &Token::Symbol(Symbol::CloseParen) != self.current() {
+                    panic!("Error: no closed parenthesis");
+                }
+
+                self.total_inst += 1;
+                self.insts.insert(op, self.total_inst);
+                self.move_token();
+                self.total_inst
+            }
+            Token::Ident(Ident::OutputNum) => {
+                self.move_token();
+                if &Token::Symbol(Symbol::OpenParen) == self.current() {
+                    self.move_token();
+
+                    if &Token::Symbol(Symbol::CloseParen) != self.current() {
+                        panic!("Error: no closed parenthesis");
+                    }
+                } else {
+                    panic!("Errorr: no opened parenthesis");
+                }
+                -1
+            }
+            Token::Ident(UserDefined(func)) => -1,
             _ => panic!("Error: Invalid funcCall format"),
-        };
-        -1
+        }
     }
     fn if_statement(&mut self) {
         // "if" relation "then" statSequence ["else" statSequence] "fi"
@@ -456,6 +494,7 @@ impl Parser {
                 self.assignment();
             }
             Token::Call => {
+                self.move_token();
                 self.func_call();
             }
             Token::If => {
@@ -842,6 +881,22 @@ mod tests {
     }
 
     #[test]
+    fn func_call_test() {
+        let input = String::from(
+            "main
+        var a; {
+            let a <- call InputNum();
+            call OutputNewLine();
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+    }
+
+    #[test]
     fn if_statement_test1() {
         let input = String::from(
             "main
@@ -921,7 +976,7 @@ fi
         parse.show_insts();
         parse.show_blocks();
     }
-    #[test]
+
     fn while_test() {
         let input = String::from(
             "main
@@ -931,6 +986,50 @@ fi
                 
                     let a <- a - 1;
                 od
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+    }
+    #[test]
+    fn if_while_test() {
+        let input = String::from(
+            "main
+        var a; {
+        let a <- 1;
+        if 1 == 2 then
+            while 1 == a do
+                
+                    let a <- a - 1;
+                od;
+        fi;
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+    }
+    #[test]
+    fn if_else_while_test() {
+        let input = String::from(
+            "main
+        var a; {
+        let a <- 1;
+        if 1 == 2 then
+            while 1 == a do
+                
+                    let a <- a - 1;
+                od;
+        else 
+            while 1 == a do 
+                let a <- a + 1;
+            od;
+        fi;
     }.",
         );
         let mut parse = Parser::new(input);

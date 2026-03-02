@@ -25,7 +25,7 @@ pub enum Operator {
 
     // Read & Write
     Read,
-    Write(String),
+    Write(i32),
     WriteNL,
     // Operator for user-defined functions
     Jsr(i32),
