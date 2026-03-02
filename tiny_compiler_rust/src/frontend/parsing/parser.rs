@@ -577,17 +577,10 @@ impl Parser {
         }
     }
 
-    // TODO: TEST
     fn var_decl(&mut self) {
         // "var" ident {"," ident} ";"
         println!("Current Token at VarDecl: {}", self.current());
         self.move_token();
-        // if matches!(self.current(), &Ident(_)) {
-        //     // self.formalParam();
-        //     self.vars.insert(self.current().clone(), 0); // 0 for default
-        // } else {
-        //     return;
-        // }
         match self.current() {
             Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), None),
             _ => return,
@@ -912,7 +905,7 @@ mod tests {
         let input = String::from(
             "main
         var a; {
-            let a <- -1
+            let a <- -1;
     }.",
         );
         let mut parse = Parser::new(input);
@@ -959,7 +952,7 @@ mod tests {
         let input = String::from(
             "main
         var a; {
-        let a <- 1;
+        let a <- call InputNum();
             if 1 == 2 then
     let a <- a - 1;
 fi
