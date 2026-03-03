@@ -2,6 +2,7 @@
 //     self, Add, Beq, Bge, Bgt, Ble, Blt, Bne, Bra, Cmp, Const, Div, End, Jsr, Mul, Phi, Ret, Sub,
 // };
 use crate::frontend::fsm::token::{Ident, Token};
+use crate::frontend::operators::InstStorage;
 use crate::frontend::operators::{inst::Inst, operator::Operator};
 use std::cell::{Ref, RefCell};
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -25,6 +26,7 @@ pub struct Block {
     block_num: usize,
     insts: VecDeque<Inst>,
     table: HashMap<String, Option<i32>>,
+    inst_storage: InstStorage,
     nexts: Vec<usize>,
 }
 
@@ -38,6 +40,7 @@ impl<'a> Block {
             insts: VecDeque::new(),
             table: table,
             nexts: Vec::new(),
+            inst_storage: InstStorage::new(),
         }
     }
 
@@ -46,6 +49,10 @@ impl<'a> Block {
     // pub fn add_prev(&mut self, block_num: usize) {
     //     self.prevs.borrow_mut().push(block_num);
     // }
+
+    pub fn get_block_name(&self) -> String {
+        self.block_name.clone()
+    }
 
     /// add_next
     /// add new next block in block's next
@@ -102,6 +109,14 @@ impl<'a> Block {
     /// get the total number of inst in the block
     pub fn get_inst_num(&self) -> i32 {
         self.insts.len() as i32
+    }
+
+    pub fn get_insts(&self) -> VecDeque<Inst> {
+        self.insts.clone()
+    }
+
+    pub fn get_nexts(&self) -> &Vec<usize> {
+        &self.nexts
     }
 
     /// contains_inst

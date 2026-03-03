@@ -27,6 +27,7 @@ pub struct Parser {
     total_inst: i32,
     total_block: usize,
     inst_storage: InstStorage,
+    visualizer: Vec<String>,
 }
 
 impl Parser {
@@ -61,6 +62,8 @@ impl Parser {
             total_block: 1,
             inst_storage: InstStorage::new(),
             block0: block0, // block0 will be added to front at the end
+
+            visualizer: Vec::new(),
         }
     }
     fn current(&self) -> &Token {
@@ -497,7 +500,7 @@ impl Parser {
         self.connect(while_num, do_num);
 
         self.switch_block(while_num);
-        let (cmp, cond) = self.relation(); // TODO: Return Value 
+        let (cmp, cond) = self.relation();
         if self.current() != &Token::Do {
             panic!("Error: Invalid While Statement Format, Missing \"do\"");
         }
@@ -654,6 +657,7 @@ impl Parser {
     }
     fn formal_param(&mut self) -> Vec<Token> {
         // "( [ident {"," ident}] ")"
+        // how do I update variable table?
         let mut params: Vec<Token> = vec![];
         self.move_token();
         if self.current() == &Token::Symbol(Symbol::OpenParen) {
@@ -674,7 +678,7 @@ impl Parser {
             if self.current() == &Token::Symbol(Symbol::CloseParen) {
                 self.move_token();
             } else {
-                panic!("Error: Missing Closed Parenthesis: \")\"");
+                panic!("Error: Missing Closed Parenthesis: {}", self.current());
             }
         }
         params
@@ -790,7 +794,7 @@ impl Parser {
     }
 
     fn connect(&mut self, front_num: usize, back_num: usize) {
-        let mut front_block = if let Some(front) = self.blocks.get(&front_num) {
+        let front_block = if let Some(front) = self.blocks.get(&front_num) {
             front
         } else {
             panic!(
@@ -867,6 +871,51 @@ impl Parser {
         }
         None
     }
+
+    // TODO: Study Dom
+    fn visualize_ir(&self) {
+        println!("digraph G {{");
+        for i in 0..self.total_block + 1 {
+            if let Some(bb) = self.blocks.get(&i) {
+                print!(
+                    "{} [shape=record, label=\"<b>{} |{{",
+                    bb.borrow().get_block_name(),
+                    bb.borrow().get_block_name(),
+                );
+                for j in 0..bb.borrow().get_insts().len() {
+                    if j == bb.borrow().get_insts().len() - 1 {
+                        print!(
+                            "{}:{}",
+                            bb.borrow().get_insts()[j].clone().get_inst_num(),
+                            bb.borrow().get_insts()[j].clone().get_operator()
+                        );
+                        break;
+                    }
+                    print!(
+                        "{}:{}|",
+                        bb.borrow().get_insts()[j].clone().get_inst_num(),
+                        bb.borrow().get_insts()[j].clone().get_operator()
+                    );
+                }
+                println!("}}\"]");
+            }
+        }
+
+        for i in 0..self.total_block {
+            if let Some(bb) = self.blocks.get(&i) {
+                for n in bb.borrow().clone().get_nexts() {
+                    if let Some(dd) = self.blocks.get(&n) {
+                        println!(
+                            "{} :s -> {} :n ;",
+                            bb.borrow().get_block_name(),
+                            dd.borrow().get_block_name(),
+                        );
+                    }
+                }
+            }
+        }
+        println!("}}");
+    }
     // pub fn arithm(&mut self, op: Operator, x: &mut Result, y: &mut Result) {
     //     let mut z = Result::new(Kind::Const, 0, 0, 0);
     //     if x.get_kind() == Kind::Const && y.get_kind() == Kind::Const {
@@ -942,6 +991,7 @@ mod tests {
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
 
     #[test]
@@ -957,6 +1007,7 @@ mod tests {
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
 
     #[test]
@@ -1172,6 +1223,31 @@ fi
             let a <- 4;
         fi;
     }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+    }
+
+    #[test]
+    fn user_defined_test() {
+        let input = String::from(
+            "main
+var a, b; 
+
+void function sum(a); var c; {
+    let c <- a;
+    return c;
+};
+
+{
+let a <- 1;
+let b <- call sum(a);
+call OutputNum(b);
+}
+.",
         );
         let mut parse = Parser::new(input);
         parse.computation();

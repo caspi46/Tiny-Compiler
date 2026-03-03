@@ -12,6 +12,7 @@ use std::collections::HashMap;
 // Since this is only for optimizing so far, this is not used for the actual Inst collection yet
 // But, depending on the situation, it could be used as collection
 // But, the collection is only for Add, Sub, Div, and Mul, so creating extra collection is unavoidable.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstStorage {
     adds: HashMap<Operator, i32>,
     subs: HashMap<Operator, i32>,
