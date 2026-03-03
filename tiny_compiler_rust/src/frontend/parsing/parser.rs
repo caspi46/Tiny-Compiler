@@ -498,7 +498,7 @@ impl Parser {
         self.connect(while_num, do_num);
 
         self.switch_block(while_num);
-        self.relation(); // TODO: Return Value 
+        let (cmp, cond) = self.relation(); // TODO: Return Value 
         if self.current() != &Token::Do {
             panic!("Error: Invalid While Statement Format, Missing \"do\"");
         }
@@ -553,6 +553,8 @@ impl Parser {
         self.connect(while_num, od_num);
 
         self.switch_block(od_num);
+        self.add_inst_to_head(Operator::EMPTY);
+        self.update_rel_op(while_num, (cond, self.total_inst));
         self.move_token();
     }
     fn return_statement(&mut self) {
