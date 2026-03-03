@@ -402,8 +402,6 @@ impl Parser {
             phis = self.generate_phi(if_key, then_key);
         }
         // create phi functioins here for fi block (LEFT in Phi(Left, Right))
-        // At this point Right should be the original inst#
-        // TODO: identify which variable is updated
         println!("Current Token after THEN: {}", self.current());
 
         if self.current() == &Token::Else {
@@ -451,6 +449,7 @@ impl Parser {
             if phis.len() > 0 {
                 loc_rhs = (cond, self.total_inst + 1);
             } else {
+                self.switch_block(fi_key);
                 let rhs = self.add_inst_to_head(Operator::EMPTY);
                 loc_rhs = (cond, rhs);
             }
@@ -1153,6 +1152,24 @@ fi
             while 1 == a do 
                 let a <- a + 1;
             od;
+        fi;
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+    }
+
+    #[test]
+    fn phi_func_test() {
+        let input = String::from(
+            "main
+        var a; {
+        let a <- 1;
+        if 1 == 2 then
+            let a <- 4;
         fi;
     }.",
         );
