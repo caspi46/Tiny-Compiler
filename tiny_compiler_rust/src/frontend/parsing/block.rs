@@ -59,6 +59,22 @@ impl<'a> Block {
         &self.insts[0]
     }
 
+    pub fn get_head_num(&self) -> Option<i32> {
+        if self.insts.len() == 0 {
+            return None;
+        }
+        Some(self.insts[0].clone().get_inst_num())
+    }
+
+    pub fn get_inst_num_index(&self, inst_num: i32) -> Option<usize> {
+        for i in 0..self.insts.len() {
+            if self.insts[i].clone().get_inst_num() == inst_num {
+                return Some(i);
+            }
+        }
+        return None;
+    }
+
     /// get_tail
     /// get the last inst of the block
     pub fn get_tail(&self) -> &Inst {
@@ -179,6 +195,14 @@ impl<'a> Block {
             }
             self.insts[i] = inst;
         }
+    }
+
+    pub fn fill_in_none(&mut self, loc_rhs: (i32, i32)) -> bool {
+        if let Some(i) = self.get_inst_num_index(loc_rhs.0) {
+            self.insts[i].update_op_inst2(loc_rhs.1);
+            return true;
+        }
+        return false;
     }
 
     // pub fn fill_in_table(&mut self, ident: Ident, inst_num: i32) {

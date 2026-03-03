@@ -203,20 +203,19 @@ impl Parser {
         // }
         let rel_op = self.current().clone();
         let rhs = self.expression();
-        let cmp_inst = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
+        let cmp = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
         let rel_inst = match rel_op {
-            Token::RelOp(EQ) => self.add_inst_to_tail(Operator::Beq(lhs, rhs)),
-            Token::RelOp(NE) => self.add_inst_to_tail(Operator::Bne(lhs, rhs)),
-            Token::RelOp(GT) => self.add_inst_to_tail(Operator::Bgt(lhs, rhs)),
-
-            Token::RelOp(LT) => self.add_inst_to_tail(Operator::Blt(lhs, rhs)),
-            Token::RelOp(GE) => self.add_inst_to_tail(Operator::Bge(lhs, rhs)),
-            Token::RelOp(LE) => self.add_inst_to_tail(Operator::Blt(lhs, rhs)),
+            Token::RelOp(EQ) => self.add_inst_to_tail(Operator::Bne(cmp, None)),
+            Token::RelOp(NE) => self.add_inst_to_tail(Operator::Beq(cmp, None)),
+            Token::RelOp(GT) => self.add_inst_to_tail(Operator::Ble(cmp, None)),
+            Token::RelOp(LT) => self.add_inst_to_tail(Operator::Bge(cmp, None)),
+            Token::RelOp(GE) => self.add_inst_to_tail(Operator::Blt(cmp, None)),
+            Token::RelOp(LE) => self.add_inst_to_tail(Operator::Bgt(cmp, None)),
             _ => {
                 panic!("Error, missing relOp: ==, !=, >, <, >=, <=");
             }
         };
-        (cmp_inst, rel_inst)
+        (cmp, rel_inst)
     }
     fn assignment(&mut self) -> i32 {
         // "let" ident "<-"  expression
@@ -346,16 +345,17 @@ impl Parser {
 
         // new blocks! IF, THEN, FI
         // if block
-        self.total_block += 1;
+        // self.total_block += 1;
         let before_table = self.vars.clone();
-        let if_block = RefCell::new(Block::new(
-            self.total_block,
-            "if_".to_string(),
-            before_table.clone(),
-        ));
-        self.blocks.insert(self.total_block as usize, if_block);
-        let if_key = self.total_block;
-        self.connect(self.cur_block_num, if_key);
+        let if_key = self.cur_block_num;
+        // let if_block = RefCell::new(Block::new(
+        //     self.total_block,
+        //     "if_".to_string(),
+        //     before_table.clone(),
+        // ));
+        // self.blocks.insert(self.total_block as usize, if_block);
+        // let if_key = self.total_block;
+        // self.connect(self.cur_block_num, if_key);
 
         // then block
         self.total_block += 1;
@@ -379,7 +379,7 @@ impl Parser {
         // (if_block, then_block) = self.connect(if_block, then_block);
 
         // add insts in if block
-        self.switch_block(if_key);
+        // self.switch_block(if_key);
         // self.move_token();
         let (cmp, cond) = self.relation(); // if_block saved them already
         println!("Current Token after IF: {}", self.current());
@@ -405,6 +405,7 @@ impl Parser {
         // At this point Right should be the original inst#
         // TODO: identify which variable is updated
         println!("Current Token after THEN: {}", self.current());
+
         if self.current() == &Token::Else {
             // since else is optional
             self.total_block += 1;
@@ -420,6 +421,18 @@ impl Parser {
             self.connect(if_key, else_key);
             self.switch_block(else_key);
             self.stat_sequence();
+            // self.add_inst_to_tail(Operator::Bra(jump_inst));
+            println!("Current Total Inst before phi: {}", self.total_inst);
+            // Update condition instruction
+            let loc_rhs;
+            if let Some(else_head) = self.get_current_head() {
+                loc_rhs = (cond, else_head);
+            } else {
+                self.add_inst_to_head(Operator::EMPTY);
+                loc_rhs = (cond, self.total_inst);
+            }
+            self.update_rel_op(if_key, loc_rhs);
+
             if self.cur_block_num != else_key {
                 self.connect(self.cur_block_num, fi_key);
                 phis = self.generate_phi(self.cur_block_num, else_key);
@@ -433,13 +446,22 @@ impl Parser {
             // update its RHS in phi function
         } else {
             // (if_block, fi_block) = self.connect(if_block, fi_block);
+            // let branch;
+            let loc_rhs;
+            if phis.len() > 0 {
+                loc_rhs = (cond, self.total_inst + 1);
+            } else {
+                let rhs = self.add_inst_to_head(Operator::EMPTY);
+                loc_rhs = (cond, rhs);
+            }
+            self.update_rel_op(if_key, loc_rhs);
             self.connect(if_key, fi_key);
         }
 
         if self.current() != &Token::Fi {
             panic!("Error: Invalid If Statement Format, Missing \"fi\"");
         }
-
+        println!("Current Total Inst:{}", self.total_inst);
         self.switch_block(fi_key);
         for (var, phi) in phis {
             let phi_op = Operator::Phi(phi.0, phi.1);
@@ -785,7 +807,6 @@ impl Parser {
             let vars = pre.borrow().compare_table(now);
             let mut phis = Vec::new();
             for (var, (pre_b, b)) in vars {
-                self.total_inst += 1;
                 let phi_inst = (pre_b, b);
                 phis.push((var, phi_inst));
             }
@@ -808,6 +829,12 @@ impl Parser {
         }
     }
 
+    fn update_rel_op(&mut self, cond_key: usize, loc_rhs: (i32, i32)) {
+        if let Some(bb) = self.blocks.get(&cond_key) {
+            bb.borrow_mut().fill_in_none(loc_rhs);
+        }
+    }
+
     fn update_table_with_insts(&mut self, var_to_phi: HashMap<String, i32>, start_key: usize) {
         for i in start_key..self.total_block + 1 {
             println!("Current i: {}", i);
@@ -822,6 +849,22 @@ impl Parser {
             return block.borrow().get_table();
         }
         HashMap::new()
+    }
+
+    fn is_empty_inst(&self) -> bool {
+        if let Some(block) = self.blocks.get(&self.cur_block_num) {
+            return block.borrow().get_inst_num() == 0;
+        }
+        return true;
+    }
+
+    fn get_current_head(&self) -> Option<i32> {
+        if let Some(block) = self.blocks.get(&self.cur_block_num) {
+            if let Some(h) = block.borrow().get_head_num() {
+                return Some(h);
+            }
+        }
+        None
     }
     // pub fn arithm(&mut self, op: Operator, x: &mut Result, y: &mut Result) {
     //     let mut z = Result::new(Kind::Const, 0, 0, 0);
@@ -970,10 +1013,10 @@ fi
             "main
         var a; {
         let a <- 1;
-            if 1 == 2 then
+            if 1 > 2 then
     let a <- a - 1;
     else
-    let a <- 67 + 67;
+    let a <- a;
 fi
     }.",
         );
@@ -991,8 +1034,35 @@ fi
         var a; {
         let a <- 1;
             if 1 == 2 then
+                let a <- a + 1;
                 if 1 == 2 then
                     let a <- a - 1;
+                fi;
+                else 
+                    if 1 == 3 then let a <- a - 1; fi;
+                let a <- 67 + 67;
+            fi;
+        let a <- 2;
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+    }
+    #[test]
+    fn nested_if2() {
+        let input = String::from(
+            "main
+        var a; {
+        let a <- 1;
+            if 1 == 2 then
+                let a <- a + 1;
+                if 1 == 2 then
+                    let a <- a;
+                else 
+                    let a <- 1;
                 fi;
                 else 
                     if 1 == 3 then let a <- a - 1; fi;
@@ -1028,6 +1098,7 @@ fi
         parse.show_blocks();
     }
 
+    #[test]
     fn while_test() {
         let input = String::from(
             "main

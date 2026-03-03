@@ -15,13 +15,13 @@ pub enum Operator {
     // End
     End,
     // RelOp
-    Bra(i32, i32),
-    Bne(i32, i32),
-    Ble(i32, i32),
-    Bge(i32, i32),
-    Bgt(i32, i32),
-    Beq(i32, i32),
-    Blt(i32, i32),
+    Bra(i32),
+    Bne(i32, Option<i32>),
+    Ble(i32, Option<i32>),
+    Bge(i32, Option<i32>),
+    Bgt(i32, Option<i32>),
+    Beq(i32, Option<i32>),
+    Blt(i32, Option<i32>),
 
     // Read & Write
     Read,
@@ -37,4 +37,5 @@ pub enum Operator {
     SetPar1(i32),
     SetPar2(i32),
     SetPar3(i32),
+    EMPTY, // For branch connection
 }

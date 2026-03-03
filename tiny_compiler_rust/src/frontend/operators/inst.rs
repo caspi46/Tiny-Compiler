@@ -49,13 +49,12 @@ impl<'a> Inst {
             | Operator::Div(a, b)
             | Operator::Cmp(a, b)
             | Operator::Phi(a, b)
-            | Operator::Bra(a, b)
-            | Operator::Bne(a, b)
-            | Operator::Ble(a, b)
-            | Operator::Beq(a, b)
-            | Operator::Bge(a, b)
-            | Operator::Bgt(a, b)
-            | Operator::Blt(a, b) => {
+            | Operator::Bne(a, Some(b))
+            | Operator::Ble(a, Some(b))
+            | Operator::Beq(a, Some(b))
+            | Operator::Bge(a, Some(b))
+            | Operator::Bgt(a, Some(b))
+            | Operator::Blt(a, Some(b)) => {
                 if a == check || b == check {
                     return true;
                 }
@@ -73,13 +72,12 @@ impl<'a> Inst {
             | Operator::Div(a, b)
             | Operator::Cmp(a, b)
             | Operator::Phi(a, b)
-            | Operator::Bra(a, b)
-            | Operator::Bne(a, b)
-            | Operator::Ble(a, b)
-            | Operator::Beq(a, b)
-            | Operator::Bge(a, b)
-            | Operator::Bgt(a, b)
-            | Operator::Blt(a, b) => (Some(a), Some(b)),
+            | Operator::Bne(a, Some(b))
+            | Operator::Ble(a, Some(b))
+            | Operator::Beq(a, Some(b))
+            | Operator::Bge(a, Some(b))
+            | Operator::Bgt(a, Some(b))
+            | Operator::Blt(a, Some(b)) => (Some(a), Some(b)),
             _ => (None, None),
         }
     }
@@ -92,13 +90,12 @@ impl<'a> Inst {
             Operator::Div(_, _) => Some(Operator::Div(updated_a, updated_b)),
             Operator::Cmp(_, _) => Some(Operator::Cmp(updated_a, updated_b)),
             Operator::Phi(_, _) => Some(Operator::Phi(updated_a, updated_b)),
-            Operator::Bra(_, _) => Some(Operator::Bra(updated_a, updated_b)),
-            Operator::Bne(_, _) => Some(Operator::Bne(updated_a, updated_b)),
-            Operator::Ble(_, _) => Some(Operator::Ble(updated_a, updated_b)),
-            Operator::Beq(_, _) => Some(Operator::Beq(updated_a, updated_b)),
-            Operator::Bge(_, _) => Some(Operator::Bge(updated_a, updated_b)),
-            Operator::Bgt(_, _) => Some(Operator::Bgt(updated_a, updated_b)),
-            Operator::Blt(_, _) => Some(Operator::Blt(updated_a, updated_b)),
+            Operator::Bne(_, _) => Some(Operator::Bne(updated_a, Some(updated_b))),
+            Operator::Ble(_, _) => Some(Operator::Ble(updated_a, Some(updated_b))),
+            Operator::Beq(_, _) => Some(Operator::Beq(updated_a, Some(updated_b))),
+            Operator::Bge(_, _) => Some(Operator::Bge(updated_a, Some(updated_b))),
+            Operator::Bgt(_, _) => Some(Operator::Bgt(updated_a, Some(updated_b))),
+            Operator::Blt(_, _) => Some(Operator::Blt(updated_a, Some(updated_b))),
             _ => None,
         };
         if let Some(op) = updated_op {
@@ -114,7 +111,6 @@ impl<'a> Inst {
             Operator::Div(_, b) => Some(Operator::Div(updated_a, b)),
             Operator::Cmp(_, b) => Some(Operator::Cmp(updated_a, b)),
             Operator::Phi(_, b) => Some(Operator::Phi(updated_a, b)),
-            Operator::Bra(_, b) => Some(Operator::Bra(updated_a, b)),
             Operator::Bne(_, b) => Some(Operator::Bne(updated_a, b)),
             Operator::Ble(_, b) => Some(Operator::Ble(updated_a, b)),
             Operator::Beq(_, b) => Some(Operator::Beq(updated_a, b)),
@@ -136,13 +132,12 @@ impl<'a> Inst {
             Operator::Div(a, _) => Some(Operator::Div(a, updated_b)),
             Operator::Cmp(a, _) => Some(Operator::Cmp(a, updated_b)),
             Operator::Phi(a, _) => Some(Operator::Phi(a, updated_b)),
-            Operator::Bra(a, _) => Some(Operator::Bra(a, updated_b)),
-            Operator::Bne(a, _) => Some(Operator::Bne(a, updated_b)),
-            Operator::Ble(a, _) => Some(Operator::Ble(a, updated_b)),
-            Operator::Beq(a, _) => Some(Operator::Beq(a, updated_b)),
-            Operator::Bge(a, _) => Some(Operator::Bge(a, updated_b)),
-            Operator::Bgt(a, _) => Some(Operator::Bgt(a, updated_b)),
-            Operator::Blt(a, _) => Some(Operator::Blt(a, updated_b)),
+            Operator::Bne(a, _) => Some(Operator::Bne(a, Some(updated_b))),
+            Operator::Ble(a, _) => Some(Operator::Ble(a, Some(updated_b))),
+            Operator::Beq(a, _) => Some(Operator::Beq(a, Some(updated_b))),
+            Operator::Bge(a, _) => Some(Operator::Bge(a, Some(updated_b))),
+            Operator::Bgt(a, _) => Some(Operator::Bgt(a, Some(updated_b))),
+            Operator::Blt(a, _) => Some(Operator::Blt(a, Some(updated_b))),
             _ => None,
         };
         if let Some(op) = updated_op {
@@ -156,6 +151,7 @@ impl<'a> Inst {
             Operator::SetPar2(_) => Some(Operator::SetPar2(updated)),
             Operator::SetPar3(_) => Some(Operator::SetPar3(updated)),
             Operator::Write(_) => Some(Operator::Write(updated)),
+            Operator::Bra(_) => Some(Operator::Bra(updated)),
             _ => None,
         };
 
