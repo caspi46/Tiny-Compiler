@@ -121,9 +121,11 @@ impl Parser {
                 };
 
                 if let Some(inst_num) = cur_block.borrow().check_table(&var) {
-                    return inst_num;
+                    inst_num
+                } else {
+                    println!("Warning: Uninitialized variable");
+                    0
                 }
-                panic!("Error: Invalid factor, using the uninitialized variable");
             }
             Token::Call => {
                 // skip for now (maybe after I solve the ident and num)
