@@ -921,7 +921,7 @@ impl Parser {
             }
         }
 
-        for i in 0..self.total_block {
+        for i in 0..self.total_block + 1 {
             if let Some(bb) = self.blocks.get(&i) {
                 for n in bb.borrow().clone().get_nexts() {
                     if let Some(dd) = self.blocks.get(&n) {
@@ -930,6 +930,21 @@ impl Parser {
                             bb.borrow().get_block_name(),
                             dd.borrow().get_block_name(),
                         );
+                    }
+                }
+            }
+        }
+
+        // doms:
+        for i in 0..self.total_block + 1 {
+            if let Some(bb) = self.blocks.get(&i) {
+                for n in bb.borrow().clone().get_doms() {
+                    if let Some(dd) = self.blocks.get(&n) {
+                        println!(
+                            "{}:b -> {}:b[color=blue, style=dotted, label=\"dom\"]",
+                            bb.borrow().get_block_name(),
+                            dd.borrow().get_block_name(),
+                        )
                     }
                 }
             }
@@ -1078,6 +1093,7 @@ fi
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
     #[test]
     fn if_statement_test2() {
@@ -1097,6 +1113,7 @@ fi
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
 
     #[test]
@@ -1122,6 +1139,7 @@ fi
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
     #[test]
     fn nested_if2() {

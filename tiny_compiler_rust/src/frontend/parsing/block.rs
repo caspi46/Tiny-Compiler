@@ -125,6 +125,10 @@ impl<'a> Block {
         &self.nexts
     }
 
+    pub fn get_doms(&self) -> &Vec<usize> {
+        &self.doms
+    }
+
     /// contains_inst
     /// check if the inst is in the block
     pub fn contains_inst(&self, inst: Inst) -> bool {
