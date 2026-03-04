@@ -28,6 +28,7 @@ pub struct Block {
     table: HashMap<String, Option<i32>>,
     inst_storage: InstStorage,
     nexts: Vec<usize>,
+    doms: Vec<usize>,
 }
 
 impl<'a> Block {
@@ -41,6 +42,7 @@ impl<'a> Block {
             table: table,
             nexts: Vec::new(),
             inst_storage: InstStorage::new(),
+            doms: Vec::new(),
         }
     }
 
@@ -58,6 +60,10 @@ impl<'a> Block {
     /// add new next block in block's next
     pub fn add_next(&mut self, block_num: usize) {
         self.nexts.push(block_num);
+    }
+
+    pub fn add_dom(&mut self, block_num: usize) {
+        self.doms.push(block_num);
     }
 
     /// get_head

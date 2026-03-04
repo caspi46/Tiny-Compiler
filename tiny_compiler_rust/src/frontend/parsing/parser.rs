@@ -381,6 +381,7 @@ impl Parser {
         ));
         self.blocks.insert(self.total_block, fi_block);
         let fi_key = self.total_block;
+        self.set_dom(if_key, fi_key);
         // (if_block, then_block) = self.connect(if_block, then_block);
 
         // add insts in if block
@@ -396,6 +397,7 @@ impl Parser {
         self.switch_block(then_key);
         self.stat_sequence(); // add all the instructions in the then to the then block
         self.connect(if_key, then_key);
+        self.set_dom(if_key, then_key);
 
         // generate phis for then
         let mut phis;
@@ -422,6 +424,7 @@ impl Parser {
             self.blocks.insert(self.total_block, else_block);
             let else_key = self.total_block;
             self.connect(if_key, else_key);
+            self.set_dom(if_key, else_key);
             self.switch_block(else_key);
             self.stat_sequence();
             // self.add_inst_to_tail(Operator::Bra(jump_inst));
@@ -480,7 +483,7 @@ impl Parser {
         // new block: while, then
         let before_table = self.vars.clone();
         self.total_block += 1;
-        let while_num = self.total_block;
+        let while_key = self.total_block;
         let while_block = RefCell::new(Block::new(
             self.total_block,
             "while_".to_string(),
@@ -489,7 +492,7 @@ impl Parser {
         self.blocks.insert(self.total_block, while_block);
 
         self.total_block += 1;
-        let do_num = self.total_block;
+        let do_key = self.total_block;
         let do_block = RefCell::new(Block::new(
             self.total_block,
             "do_".to_string(),
@@ -498,29 +501,33 @@ impl Parser {
         self.blocks.insert(self.total_block, do_block);
 
         // Edges
-        self.connect(self.cur_block_num, while_num);
-        self.connect(while_num, do_num);
+        self.connect(self.cur_block_num, while_key);
+        self.connect(while_key, do_key);
 
-        self.switch_block(while_num);
+        // doms
+        self.set_dom(self.cur_block_num, while_key);
+        self.set_dom(while_key, do_key);
+
+        self.switch_block(while_key);
         let (cmp, cond) = self.relation();
         if self.current() != &Token::Do {
             panic!("Error: Invalid While Statement Format, Missing \"do\"");
         }
-        self.switch_block(do_num);
+        self.switch_block(do_key);
         self.stat_sequence();
         let phis;
-        if self.cur_block_num == do_num {
-            self.connect(do_num, while_num);
-            phis = self.generate_phi(while_num, do_num);
+        if self.cur_block_num == do_key {
+            self.connect(do_key, while_key);
+            phis = self.generate_phi(while_key, do_key);
         } else {
-            self.connect(self.cur_block_num, while_num);
-            phis = self.generate_phi(while_num, self.cur_block_num);
+            self.connect(self.cur_block_num, while_key);
+            phis = self.generate_phi(while_key, self.cur_block_num);
         }
         if self.current() != &Token::Od {
             panic!("Error: Invalid While Statement Format, Missing \"od\"");
         }
         // phi instructions
-        self.switch_block(while_num);
+        self.switch_block(while_key);
         let mut ori_to_new = HashMap::new();
         let mut var_to_phi = HashMap::new();
         let mut phi_insts = Vec::new();
@@ -534,8 +541,8 @@ impl Parser {
             phi_insts.push(phi_inst);
         }
         // update instruction based on phi
-        self.update_by_phi(ori_to_new, while_num);
-        self.update_table_with_insts(var_to_phi, while_num);
+        self.update_by_phi(ori_to_new, while_key);
+        self.update_table_with_insts(var_to_phi, while_key);
         for inst in phi_insts {
             let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
                 b
@@ -546,19 +553,20 @@ impl Parser {
         }
 
         self.total_block += 1;
-        let od_num = self.total_block;
+        let od_key = self.total_block;
         let od_block = RefCell::new(Block::new(
             self.total_block,
             "od_".to_string(),
-            self.get_table_from_block(while_num),
+            self.get_table_from_block(while_key),
         ));
 
         self.blocks.insert(self.total_block, od_block);
-        self.connect(while_num, od_num);
+        self.connect(while_key, od_key);
+        self.set_dom(while_key, od_key);
 
-        self.switch_block(od_num);
+        self.switch_block(od_key);
         self.add_inst_to_head(Operator::EMPTY);
-        self.update_rel_op(while_num, (cond, self.total_inst));
+        self.update_rel_op(while_key, (cond, self.total_inst));
         self.move_token();
     }
     fn return_statement(&mut self) {
@@ -634,7 +642,8 @@ impl Parser {
     // TODO: TEST
     fn func_decl(&mut self) {
         // ["void"] "function" ident formalParam ";" funcBody ";"
-        // new block
+        // new block for bb0
+        // new block for start
         self.move_token();
         if self.current() != &Token::Function {
             panic!("Error: Missing function keyword: Function");
@@ -659,7 +668,7 @@ impl Parser {
     }
     fn formal_param(&mut self) -> Vec<Token> {
         // "( [ident {"," ident}] ")"
-        // how do I update variable table?
+        // getPar insts! TODO: Fix the format below. No loop, but check
         let mut params: Vec<Token> = vec![];
         self.move_token();
         if self.current() == &Token::Symbol(Symbol::OpenParen) {
@@ -807,6 +816,15 @@ impl Parser {
         front_block.borrow_mut().add_next(back_num as usize);
         // back.borrow_mut()
         //     .add_prev(front.borrow().get_block_num() as usize);
+    }
+
+    fn set_dom(&mut self, x_num: usize, y_num: usize) {
+        let x_block = if let Some(x) = self.blocks.get(&x_num) {
+            x
+        } else {
+            panic!("Error: No X Block Found at {} in set_dom function", x_num,)
+        };
+        x_block.borrow_mut().add_dom(y_num as usize);
     }
 
     fn generate_phi(&mut self, pre_key: usize, now_key: usize) -> Vec<(String, (i32, i32))> {
