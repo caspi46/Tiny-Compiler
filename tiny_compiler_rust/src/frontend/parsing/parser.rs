@@ -18,7 +18,7 @@ pub struct Parser {
     blocks: BTreeMap<usize, RefCell<Block>>,
     vars: HashMap<String, Option<i32>>,
     insts: HashMap<Operator, i32>,
-    funcs: HashMap<String, Vec<Token>>,
+    funcs: HashMap<String, usize>,
     cur_token_index: usize,
     // cur_block: &'a RefCell<Block>,
     cur_block_num: usize,
@@ -152,7 +152,7 @@ impl Parser {
         if self.current() != &Token::Op(MUL) && self.current() != &Token::Op(DIV) {
             return x;
         }
-
+        let mut return_val = x;
         let mut calc;
         while self.current() == &Token::Op(MUL) || self.current() == &Token::Op(DIV) {
             println!("Current Token at MUL&DIV loop: {}", self.current());
@@ -163,13 +163,30 @@ impl Parser {
                 Token::Op(DIV) => Operator::Div(x, y),
                 _ => panic!("Error, Invalid Div or Mul"),
             };
-            let inst_num = self.add_inst_to_tail(op.clone());
-            self.insts.insert(op, inst_num);
+            let expected_num = self.total_inst + 1;
+            if let Some(mul) = self.inst_storage.add_muls(op.clone(), expected_num) {
+                return_val = if mul == expected_num {
+                    let inst_num = self.add_inst_to_tail(op.clone());
+                    self.insts.insert(op.clone(), inst_num);
+                    inst_num
+                } else {
+                    mul
+                };
+            }
+            if let Some(div) = self.inst_storage.add_divs(op.clone(), expected_num) {
+                return_val = if div == expected_num {
+                    let inst_num = self.add_inst_to_tail(op.clone());
+                    self.insts.insert(op, inst_num);
+                    inst_num
+                } else {
+                    div
+                };
+            }
             println!("end of the MUL&DIV loop : {}", self.current());
         }
         // should return i32
         // i32 is the inst# that takes the calculation result
-        self.total_inst
+        return_val
     }
     fn expression(&mut self) -> i32 {
         // term { ("+" | "-") term }
@@ -182,6 +199,7 @@ impl Parser {
             return x;
         }
         let mut calc;
+        let mut return_val = x;
         while self.current() == &Token::Op(ADD) || self.current() == &Token::Op(SUB) {
             println!("Current Token at ADD&SUB loop: {}", self.current());
             calc = self.current().clone();
@@ -191,10 +209,26 @@ impl Parser {
                 Token::Op(SUB) => Operator::Sub(x, y),
                 _ => panic!("Error: Invalid ADD or SUB format"),
             };
-            let inst_num = self.add_inst_to_tail(op.clone());
-            self.insts.insert(op, inst_num);
+            let expected_num = self.total_inst + 1;
+            if let Some(add) = self.inst_storage.add_adds(op.clone(), expected_num) {
+                return_val = if add == expected_num {
+                    let inst_num = self.add_inst_to_tail(op.clone());
+                    self.insts.insert(op.clone(), inst_num);
+                    inst_num
+                } else {
+                    add
+                };
+            } else if let Some(sub) = self.inst_storage.add_subs(op.clone(), expected_num) {
+                return_val = if sub == expected_num {
+                    let inst_num = self.add_inst_to_tail(op.clone());
+                    self.insts.insert(op, inst_num);
+                    inst_num
+                } else {
+                    sub
+                };
+            }
         }
-        self.total_inst // TODO: test if the return value is correct
+        return_val
         // return the i32 value for that takes the calculation for example: add (1) (2) -> (1)
     }
     fn relation(&mut self) -> (i32, i32) {
@@ -292,8 +326,8 @@ impl Parser {
             }
             Token::Ident(UserDefined(func)) => {
                 let func_call = Operator::Jsr(func.clone());
-                let params = if let Some(p) = self.funcs.get(func) {
-                    p.len()
+                let params = if let Some(&p) = self.funcs.get(func) {
+                    p
                 } else {
                     panic!("Error: Invalid Function Format")
                 };
@@ -645,6 +679,13 @@ impl Parser {
         // new block for bb0
         // new block for start
         self.move_token();
+        // this tells that the function must have return value or not
+        let is_void = if self.current() == &Token::Void {
+            self.move_token();
+            true
+        } else {
+            false
+        };
         if self.current() != &Token::Function {
             panic!("Error: Missing function keyword: Function");
         }
@@ -666,23 +707,24 @@ impl Parser {
             panic!("Error: Missing Semicolon in funcDecl");
         }
     }
-    fn formal_param(&mut self) -> Vec<Token> {
+    fn formal_param(&mut self) -> usize {
+        // return # of parameters will be nice
         // "( [ident {"," ident}] ")"
         // getPar insts! TODO: Fix the format below. No loop, but check
-        let mut params: Vec<Token> = vec![];
+        let mut params = 0;
         self.move_token();
         if self.current() == &Token::Symbol(Symbol::OpenParen) {
             self.move_token();
             if matches!(self.current(), &Token::Ident(_)) {
                 // do something with identifier
-                params.push(self.current().clone());
+                params += 1;
             }
             self.move_token();
-            while self.current() == &Token::Symbol(Symbol::SemiColon) {
+            while self.current() == &Token::Symbol(Symbol::Comma) {
                 self.move_token();
                 if matches!(self.current(), &Token::Ident(UserDefined(_))) {
                     // do something with identifier
-                    params.push(self.current().clone());
+                    params += 1;
                 }
                 self.move_token();
             }
@@ -696,6 +738,7 @@ impl Parser {
     }
     fn func_body(&mut self) {
         // [varDecl] "{" [statSequence] "}"
+        // I'm thinking that the return value must be the return inst or none
         self.var_decl();
         if self.current() == &Token::Symbol(Symbol::OpenBrace) {
             self.stat_sequence();
@@ -783,6 +826,10 @@ impl Parser {
 
     fn show_insts(&self) {
         println!("Insts: {:?}", self.insts);
+    }
+
+    fn show_inst_storage(&self) {
+        println!("Inst Storage: {:?}", self.inst_storage);
     }
 
     fn show_blocks(&self) {
@@ -1270,27 +1317,47 @@ fi
     }
 
     #[test]
-    fn user_defined_test() {
+    fn opt_test1() {
         let input = String::from(
             "main
-var a, b; 
-
-void function sum(a); var c; {
-    let c <- a;
-    return c;
-};
-
-{
-let a <- 1;
-let b <- call sum(a);
-call OutputNum(b);
-}
-.",
+        var a, b, c; {
+            let a <- 1;
+            let b <- a * 1;
+            let a <- a * 1;
+            
+    }.",
         );
         let mut parse = Parser::new(input);
         parse.computation();
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.show_inst_storage();
+        parse.visualize_ir();
     }
+
+    //     #[test]
+    //     fn user_defined_test() {
+    //         let input = String::from(
+    //             "main
+    // var a, b;
+
+    // void function sum(a); var c; {
+    //     let c <- a;
+    //     return c;
+    // };
+
+    // {
+    // let a <- 1;
+    // let b <- call sum(a);
+    // call OutputNum(b);
+    // }
+    // .",
+    //         );
+    //         let mut parse = Parser::new(input);
+    //         parse.computation();
+    //         parse.show_vars();
+    //         parse.show_insts();
+    //         parse.show_blocks();
+    //     }
 }
