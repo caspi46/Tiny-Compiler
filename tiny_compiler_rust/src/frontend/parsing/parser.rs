@@ -23,7 +23,7 @@ pub struct Parser {
     // cur_block: &'a RefCell<Block>,
     cur_block_num: usize,
     // busy: Vec<i32>,
-    block0: RefCell<Block>, // after the computation, it will be added in top
+    block0: usize, // after the computation, it will be added in top
     total_inst: i32,
     total_block: usize,
     inst_storage: InstStorage,
@@ -44,6 +44,7 @@ impl Parser {
         let zero_inst = Inst::new(0, Operator::Const(0));
         block0.borrow_mut().push_head(zero_inst);
         let mut blocks = BTreeMap::new();
+        blocks.insert(0, block0);
         blocks.insert(
             1,
             RefCell::new(Block::new(1, "block_".to_string(), HashMap::new())),
@@ -61,7 +62,7 @@ impl Parser {
             total_inst: 0,
             total_block: 1,
             inst_storage: InstStorage::new(),
-            block0: block0, // block0 will be added to front at the end
+            block0: 0, // block0 will be added to front at the end
 
             visualizer: Vec::new(),
         }
@@ -98,14 +99,11 @@ impl Parser {
 
                 let op = Operator::Const(num);
                 self.move_token();
-                if let Some(i_num) = self.block0.borrow().get_inst(&op) {
+                if let Some(i_num) = self.get_bb0(&op) {
                     return i_num;
                 }
-                self.total_inst += 1;
-                let inst_num = self.total_inst * (-1);
-                let new_num = Inst::new(inst_num, op.clone());
-                self.block0.borrow_mut().push_tail(new_num);
-                self.insts.insert(op, inst_num);
+
+                let inst_num = self.add_const_to_bb0(op);
                 println!("Num's Token: {}", inst_num);
                 return inst_num;
             }
@@ -286,13 +284,25 @@ impl Parser {
         // "call" ident [ "(" [expression {"," expression}] ")"]
         // self.move_token();
         match self.current() {
-            Token::Ident(Ident::InputNum) | Token::Ident(Ident::OutputNewLine) => {
+            Token::Ident(Ident::InputNum) => {
                 // no parameter
-                let op = if self.current() == &Token::Ident(Ident::InputNum) {
-                    Operator::Read
-                } else {
-                    Operator::WriteNL
-                };
+                let op = Operator::Read;
+                self.move_token();
+                if &Token::Symbol(Symbol::OpenParen) != self.current() {
+                    panic!("Error: no open parenthesis for function call");
+                }
+                self.move_token();
+                if &Token::Symbol(Symbol::CloseParen) != self.current() {
+                    panic!("Error: no closed parenthesis");
+                }
+
+                let _ = self.add_inst_to_tail(op.clone());
+                self.move_token();
+                self.total_inst
+            }
+            Token::Ident(Ident::OutputNewLine) => {
+                // no parameter
+                let op = Operator::WriteNL;
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) != self.current() {
                     panic!("Error: no open parenthesis for function call");
@@ -387,14 +397,6 @@ impl Parser {
         // self.total_block += 1;
         let before_table = self.vars.clone();
         let if_key = self.cur_block_num;
-        // let if_block = RefCell::new(Block::new(
-        //     self.total_block,
-        //     "if_".to_string(),
-        //     before_table.clone(),
-        // ));
-        // self.blocks.insert(self.total_block as usize, if_block);
-        // let if_key = self.total_block;
-        // self.connect(self.cur_block_num, if_key);
 
         // then block
         self.total_block += 1;
@@ -543,7 +545,7 @@ impl Parser {
         self.set_dom(while_key, do_key);
 
         self.switch_block(while_key);
-        let (cmp, cond) = self.relation();
+        let (_, cond) = self.relation();
         if self.current() != &Token::Do {
             panic!("Error: Invalid While Statement Format, Missing \"do\"");
         }
@@ -702,15 +704,27 @@ impl Parser {
         if self.current() == &Token::Symbol(Symbol::SemiColon) {
             self.move_token();
             self.func_body();
+        } else {
+            panic!("Error: Missing Semicolon for formal param");
         }
         if self.current() != &Token::Symbol(Symbol::SemiColon) {
-            panic!("Error: Missing Semicolon in funcDecl");
+            panic!("Error: Missing Semicolon for func body");
         }
     }
     fn formal_param(&mut self) -> usize {
         // return # of parameters will be nice
         // "( [ident {"," ident}] ")"
         // getPar insts! TODO: Fix the format below. No loop, but check
+        self.total_block += 1;
+        let func_key = self.total_block;
+        let func_block = RefCell::new(Block::new(
+            self.total_block,
+            "func_".to_string(),
+            HashMap::new(),
+        ));
+        self.blocks.insert(func_key, func_block);
+        self.switch_block(self.total_block);
+
         let mut params = 0;
         self.move_token();
         if self.current() == &Token::Symbol(Symbol::OpenParen) {
@@ -739,6 +753,8 @@ impl Parser {
     fn func_body(&mut self) {
         // [varDecl] "{" [statSequence] "}"
         // I'm thinking that the return value must be the return inst or none
+
+        // here
         self.var_decl();
         if self.current() == &Token::Symbol(Symbol::OpenBrace) {
             self.stat_sequence();
@@ -783,13 +799,26 @@ impl Parser {
             );
         }
         // self.blocks.push(block);
-        self.blocks.insert(0, self.block0.clone());
         self.connect(0, 1);
     }
 
     /// helper functions to add instruction to the current block
     ///
     ///
+    fn add_const_to_bb0(&mut self, op: Operator) -> i32 {
+        self.total_inst += 1;
+        let inst_num = self.total_inst * (-1);
+        let new_const = Inst::new(inst_num, op.clone());
+        let bb0 = if let Some(b) = self.blocks.get(&0) {
+            b
+        } else {
+            panic!("Error: No Block Found at {}", self.cur_block_num)
+        };
+        bb0.borrow_mut().push_tail(new_const);
+        self.insts.insert(op, inst_num);
+        inst_num
+    }
+
     fn add_inst_to_tail(&mut self, op: Operator) -> i32 {
         self.total_inst += 1;
         let new_inst = Inst::new(self.total_inst, op);
@@ -818,6 +847,10 @@ impl Parser {
 
     fn switch_block(&mut self, key: usize) {
         self.cur_block_num = key;
+    }
+
+    fn switch_block0(&mut self, key: usize) {
+        self.block0 = key;
     }
 
     fn show_vars(&self) {
@@ -935,6 +968,13 @@ impl Parser {
             if let Some(h) = block.borrow().get_head_num() {
                 return Some(h);
             }
+        }
+        None
+    }
+
+    fn get_bb0(&self, op: &Operator) -> Option<i32> {
+        if let Some(bb0) = self.blocks.get(&0) {
+            return bb0.borrow().get_inst(op);
         }
         None
     }
@@ -1115,6 +1155,7 @@ mod tests {
             let a <- call InputNum();
             call OutputNewLine();
             call OutputNum(a);
+            call OutputNum(call InputNum());
     }.",
         );
         let mut parse = Parser::new(input);
@@ -1122,6 +1163,7 @@ mod tests {
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
 
     #[test]
@@ -1233,6 +1275,31 @@ fi
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn nested_while2() {
+        let input = String::from(
+            "main
+        var a; {
+        let a <- 1;
+            while 1 == a do
+                while 1 == a do 
+                    while 2 == a do
+                        let a <- a - 1;
+                    od;
+                od;
+            let a <- a + 1;
+            od
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
     }
 
     #[test]
@@ -1296,6 +1363,7 @@ fi
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
 
     #[test]
