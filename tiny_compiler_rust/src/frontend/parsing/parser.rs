@@ -130,6 +130,7 @@ impl Parser {
                 println!("Factor is Call");
                 self.move_token();
                 match self.current() {
+                    // TODO: HAVE TO ADD THE non-void user-defined function
                     Token::Ident(Ident::InputNum) => {
                         let inst_num = self.func_call();
                         return inst_num; // Should call funcCall 
@@ -973,7 +974,7 @@ impl Parser {
     }
 
     fn get_bb0(&self, op: &Operator) -> Option<i32> {
-        if let Some(bb0) = self.blocks.get(&0) {
+        if let Some(bb0) = self.blocks.get(&self.block0) {
             return bb0.borrow().get_inst(op);
         }
         None
