@@ -7,10 +7,9 @@ use crate::frontend::fsm::{
 };
 use crate::frontend::operators::{Inst, InstStorage, Operator};
 use crate::frontend::parsing::block::Block;
-use crate::frontend::parsing::result::{Kind, Result};
-use std::cell::{Ref, RefCell};
-use std::collections::{BTreeMap, HashMap, LinkedList};
-use std::sync::Arc;
+// use crate::frontend::parsing::result::{Kind, Result};
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive()]
 pub struct Parser {
@@ -23,11 +22,10 @@ pub struct Parser {
     // cur_block: &'a RefCell<Block>,
     cur_block_num: usize,
     // busy: Vec<i32>,
-    block0: usize, // after the computation, it will be added in top
+    block0_num: usize,
     total_inst: i32,
     total_block: usize,
     inst_storage: InstStorage,
-    visualizer: Vec<String>,
 }
 
 impl Parser {
@@ -62,9 +60,7 @@ impl Parser {
             total_inst: 0,
             total_block: 1,
             inst_storage: InstStorage::new(),
-            block0: 0, // block0 will be added to front at the end
-
-            visualizer: Vec::new(),
+            block0_num: 0, // block0 will be added to front at the end
         }
     }
     fn current(&self) -> &Token {
@@ -674,6 +670,7 @@ impl Parser {
                 self.current()
             );
         }
+        println!("End of Var Decl {}", self.current());
     }
 
     // TODO: TEST
@@ -681,7 +678,8 @@ impl Parser {
         // ["void"] "function" ident formalParam ";" funcBody ";"
         // new block for bb0
         // new block for start
-        self.move_token();
+        let global_vars = self.vars.clone();
+        // self.move_token();
         // this tells that the function must have return value or not
         let is_void = if self.current() == &Token::Void {
             self.move_token();
@@ -689,6 +687,7 @@ impl Parser {
         } else {
             false
         };
+
         if self.current() != &Token::Function {
             panic!("Error: Missing function keyword: Function");
         }
@@ -700,22 +699,16 @@ impl Parser {
             Token::Ident(Ident::UserDefined(f)) => f.clone(),
             _ => panic!("error: Invalid Function name"),
         };
-        let params = self.formal_param();
-        self.funcs.insert(func, params);
-        if self.current() == &Token::Symbol(Symbol::SemiColon) {
-            self.move_token();
-            self.func_body();
-        } else {
-            panic!("Error: Missing Semicolon for formal param");
-        }
-        if self.current() != &Token::Symbol(Symbol::SemiColon) {
-            panic!("Error: Missing Semicolon for func body");
-        }
-    }
-    fn formal_param(&mut self) -> usize {
-        // return # of parameters will be nice
-        // "( [ident {"," ident}] ")"
-        // getPar insts! TODO: Fix the format below. No loop, but check
+        self.total_block += 1;
+        let func_block0_key = self.total_block;
+        let func_block0 = RefCell::new(Block::new(
+            self.total_block,
+            "func_block0_".to_string(),
+            HashMap::new(),
+        ));
+        self.blocks.insert(func_block0_key, func_block0);
+        self.switch_block0(func_block0_key);
+
         self.total_block += 1;
         let func_key = self.total_block;
         let func_block = RefCell::new(Block::new(
@@ -724,24 +717,94 @@ impl Parser {
             HashMap::new(),
         ));
         self.blocks.insert(func_key, func_block);
-        self.switch_block(self.total_block);
+        self.switch_block(func_key);
+
+        self.connect(func_block0_key, func_key);
+        let params = self.formal_param();
+        self.funcs.insert(func, params);
+        if self.current() == &Token::Symbol(Symbol::SemiColon) {
+            println!("Going to Func Body");
+            self.move_token();
+            self.func_body();
+        } else {
+            panic!("Error: Missing Semicolon for formal param");
+        }
+        if self.current() != &Token::Symbol(Symbol::SemiColon) {
+            panic!("Error: Missing Semicolon for func body");
+        }
+        self.vars = global_vars;
+        self.insts = HashMap::new();
+    }
+    fn formal_param(&mut self) -> usize {
+        // return # of parameters will be nice
+        // "( [ident {"," ident}] ")"
+        // getPar insts! TODO: Fix the format below. No loop, but check
 
         let mut params = 0;
         self.move_token();
         if self.current() == &Token::Symbol(Symbol::OpenParen) {
+            // self.move_token();
+            // if matches!(self.current(), &Token::Ident(_)) {
+            //     // do something with identifier
+            //     params += 1;
+            // }
+            // self.move_token();
+            // while self.current() == &Token::Symbol(Symbol::Comma) {
+            //     self.move_token();
+            //     if matches!(self.current(), &Token::Ident(UserDefined(_))) {
+            //         // do something with identifier
+            //         params += 1;
+            //     }
+            //     self.move_token();
+            // }
+
+            let mut op;
+            let mut par;
+            // param1:
             self.move_token();
-            if matches!(self.current(), &Token::Ident(_)) {
-                // do something with identifier
-                params += 1;
-            }
-            self.move_token();
-            while self.current() == &Token::Symbol(Symbol::Comma) {
-                self.move_token();
-                if matches!(self.current(), &Token::Ident(UserDefined(_))) {
-                    // do something with identifier
+            match self.current() {
+                Token::Ident(UserDefined(par1)) => {
                     params += 1;
+                    op = Operator::GetPar1;
+                    par = par1.to_string();
+
+                    let par1_inst = self.add_inst_to_tail(op);
+                    self.vars.insert(par.to_string(), Some(par1_inst));
+                    self.move_token();
                 }
+                _ => (),
+            }
+            // param2:
+            if self.current() == &Token::Symbol(Symbol::Comma) {
                 self.move_token();
+                match self.current() {
+                    Token::Ident(UserDefined(par2)) => {
+                        params += 1;
+                        op = Operator::GetPar2;
+                        par = par2.to_string();
+
+                        let par2_inst = self.add_inst_to_tail(op);
+                        self.vars.insert(par.to_string(), Some(par2_inst));
+                        self.move_token();
+                    }
+                    _ => (),
+                }
+            }
+            // param3:
+            if self.current() == &Token::Symbol(Symbol::Comma) {
+                self.move_token();
+                match self.current() {
+                    Token::Ident(UserDefined(par3)) => {
+                        params += 1;
+                        op = Operator::GetPar3;
+                        par = par3.to_string();
+
+                        let par3_inst = self.add_inst_to_tail(op);
+                        self.vars.insert(par.to_string(), Some(par3_inst));
+                        self.move_token();
+                    }
+                    _ => (),
+                }
             }
             if self.current() == &Token::Symbol(Symbol::CloseParen) {
                 self.move_token();
@@ -754,15 +817,23 @@ impl Parser {
     fn func_body(&mut self) {
         // [varDecl] "{" [statSequence] "}"
         // I'm thinking that the return value must be the return inst or none
+        // so, I can check it with the existance of "void"
 
         // here
+
+        println!("In FuncBody: {}", self.current());
         self.var_decl();
+        println!("After Func's VarDecl: {}", self.current());
+        self.move_token();
         if self.current() == &Token::Symbol(Symbol::OpenBrace) {
+            println!("Before Stat Sequence for Func: {}", self.current());
             self.stat_sequence();
             if self.current() != &Token::Symbol(Symbol::CloseBrace) {
                 panic!("Error: FuncBody missing Closed Brace: \"}}\"");
             }
         }
+        self.move_token();
+        println!("End of Func Body: {}", self.current());
     }
     fn computation(&mut self) {
         // "main" [varDecl] {funcDecl} "{" statSequence "}" "."
@@ -775,7 +846,9 @@ impl Parser {
             self.var_decl();
             self.move_token();
         }
-        while self.current() == &Token::Void {
+        println!("Before Checking Function: {}", self.current());
+        while self.current() == &Token::Void || self.current() == &Token::Function {
+            println!("Going to Func Decl");
             self.func_decl();
             self.move_token();
         }
@@ -851,7 +924,7 @@ impl Parser {
     }
 
     fn switch_block0(&mut self, key: usize) {
-        self.block0 = key;
+        self.block0_num = key;
     }
 
     fn show_vars(&self) {
@@ -974,7 +1047,7 @@ impl Parser {
     }
 
     fn get_bb0(&self, op: &Operator) -> Option<i32> {
-        if let Some(bb0) = self.blocks.get(&self.block0) {
+        if let Some(bb0) = self.blocks.get(&self.block0_num) {
             return bb0.borrow().get_inst(op);
         }
         None
@@ -1405,28 +1478,28 @@ fi
         parse.visualize_ir();
     }
 
-    //     #[test]
-    //     fn user_defined_test() {
-    //         let input = String::from(
-    //             "main
-    // var a, b;
+    #[test]
+    fn user_defined_test() {
+        let input = String::from(
+            "main
+    var a, b;
 
-    // void function sum(a); var c; {
-    //     let c <- a;
-    //     return c;
-    // };
+    function sum(a); var c; {
+        let c <- a;
+        return c;
+    };
 
-    // {
-    // let a <- 1;
-    // let b <- call sum(a);
-    // call OutputNum(b);
-    // }
-    // .",
-    //         );
-    //         let mut parse = Parser::new(input);
-    //         parse.computation();
-    //         parse.show_vars();
-    //         parse.show_insts();
-    //         parse.show_blocks();
-    //     }
+    {
+    let a <- 1;
+    let b <- call sum(a);
+    call OutputNum(b);
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+    }
 }
