@@ -17,7 +17,7 @@ pub struct Parser {
     blocks: BTreeMap<usize, RefCell<Block>>,
     vars: HashMap<String, Option<i32>>,
     insts: HashMap<Operator, i32>,
-    funcs: HashMap<String, usize>,
+    funcs: HashMap<String, (usize, i32)>,
     cur_token_index: usize,
     // cur_block: &'a RefCell<Block>,
     cur_block_num: usize,
@@ -333,7 +333,7 @@ impl Parser {
             }
             Token::Ident(UserDefined(func)) => {
                 let func_call = Operator::Jsr(func.clone());
-                let params = if let Some(&p) = self.funcs.get(func) {
+                let (params, func_start) = if let Some(&p) = self.funcs.get(func) {
                     p
                 } else {
                     panic!("Error: Invalid Function Format")
@@ -692,13 +692,11 @@ impl Parser {
             panic!("Error: Missing function keyword: Function");
         }
         self.move_token();
-        if !matches!(self.current(), &Token::Ident(_)) {
-            panic!("Error: Missing function name: Ident(_)");
-        }
-        let func = match self.current() {
-            Token::Ident(Ident::UserDefined(f)) => f.clone(),
-            _ => panic!("error: Invalid Function name"),
+        let func_name = match self.current() {
+            Token::Ident(UserDefined(func)) => func.clone(),
+            _ => panic!("Error: Missing function name: Ident(_)"),
         };
+
         self.total_block += 1;
         let func_block0_key = self.total_block;
         let func_block0 = RefCell::new(Block::new(
@@ -711,17 +709,12 @@ impl Parser {
 
         self.total_block += 1;
         let func_key = self.total_block;
-        let func_block = RefCell::new(Block::new(
-            self.total_block,
-            "func_".to_string(),
-            HashMap::new(),
-        ));
+        let func_block = RefCell::new(Block::new(self.total_block, func_name, HashMap::new()));
         self.blocks.insert(func_key, func_block);
         self.switch_block(func_key);
 
         self.connect(func_block0_key, func_key);
         let params = self.formal_param();
-        self.funcs.insert(func, params);
         if self.current() == &Token::Symbol(Symbol::SemiColon) {
             println!("Going to Func Body");
             self.move_token();
@@ -734,6 +727,10 @@ impl Parser {
         }
         self.vars = global_vars;
         self.insts = HashMap::new();
+        self.switch_block(func_key);
+        if let (Some(name), Some(head)) = (self.get_current_name(), self.get_current_head()) {
+            self.funcs.insert(name, (params, head));
+        }
     }
     fn formal_param(&mut self) -> usize {
         // return # of parameters will be nice
@@ -812,7 +809,7 @@ impl Parser {
                 panic!("Error: Missing Closed Parenthesis: {}", self.current());
             }
         }
-        params
+        return params;
     }
     fn func_body(&mut self) {
         // [varDecl] "{" [statSequence] "}"
@@ -1035,6 +1032,13 @@ impl Parser {
             return block.borrow().get_inst_num() == 0;
         }
         return true;
+    }
+
+    fn get_current_name(&self) -> Option<String> {
+        if let Some(block) = self.blocks.get(&self.cur_block_num) {
+            return Some(block.borrow().get_block_name());
+        }
+        None
     }
 
     fn get_current_head(&self) -> Option<i32> {
