@@ -100,6 +100,10 @@ impl<'a> Block {
         &self.insts[self.insts.len()]
     }
 
+    pub fn get_tail_op(&self) -> Operator {
+        self.insts[self.insts.len() - 1].clone().get_operator()
+    }
+
     /// get_table
     /// get the table
     pub fn get_table(&self) -> HashMap<String, Option<i32>> {
@@ -228,9 +232,9 @@ impl<'a> Block {
         }
     }
 
-    pub fn fill_in_none(&mut self, loc_rhs: (i32, i32)) -> bool {
+    pub fn fill_in_none(&mut self, loc_rhs: (i32, String)) -> bool {
         if let Some(i) = self.get_inst_num_index(loc_rhs.0) {
-            self.insts[i].update_op_inst2(loc_rhs.1);
+            self.insts[i].update_rel_op_inst2(loc_rhs.1);
             return true;
         }
         return false;

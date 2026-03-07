@@ -17,19 +17,19 @@ pub enum Operator {
     End,
     // RelOp
     Bra(i32),
-    Bne(i32, Option<i32>),
-    Ble(i32, Option<i32>),
-    Bge(i32, Option<i32>),
-    Bgt(i32, Option<i32>),
-    Beq(i32, Option<i32>),
-    Blt(i32, Option<i32>),
+    Bne(i32, Option<String>),
+    Ble(i32, Option<String>),
+    Bge(i32, Option<String>),
+    Bgt(i32, Option<String>),
+    Beq(i32, Option<String>),
+    Blt(i32, Option<String>),
 
     // Read & Write
     Read,
     Write(i32),
     WriteNL,
     // Operator for user-defined functions
-    Jsr(i32), // block name
+    Jsr(String), // block name
     Ret(i32),
     // For now, only three parameters
     GetPar1,

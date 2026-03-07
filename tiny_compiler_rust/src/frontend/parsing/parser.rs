@@ -17,7 +17,7 @@ pub struct Parser {
     blocks: BTreeMap<usize, RefCell<Block>>,
     vars: HashMap<String, Option<i32>>,
     insts: HashMap<Operator, i32>,
-    funcs: HashMap<String, (usize, i32)>,
+    funcs: HashMap<String, (usize, usize)>,
     cur_token_index: usize,
     // cur_block: &'a RefCell<Block>,
     cur_block_num: usize,
@@ -52,7 +52,6 @@ impl Parser {
             funcs: HashMap::new(),
             cur_token_index: 0,
             cur_block_num: 0,
-            // busy,
             total_inst: 0,
             total_block: 0,
             inst_storage: InstStorage::new(),
@@ -122,6 +121,18 @@ impl Parser {
                 self.move_token();
                 match self.current() {
                     // TODO: HAVE TO ADD THE non-void user-defined function
+                    Token::Ident(Ident::UserDefined(func)) => {
+                        if let Some(func_info) = self.funcs.get(func) {
+                            if self.is_void(func_info.1) {
+                                panic!(
+                                    "Error: Invalid Function Call. The function must has return value"
+                                );
+                            }
+                            let inst_num = self.func_call();
+                            return inst_num;
+                        }
+                        panic!("Error: Invalid Function Call");
+                    }
                     Token::Ident(_) => {
                         let inst_num = self.func_call();
                         return inst_num; // Should call funcCall 
@@ -336,7 +347,7 @@ impl Parser {
             }
 
             Token::Ident(UserDefined(func)) => {
-                let (params, func_start) = if let Some(&p) = self.funcs.get(func) {
+                let (params, _) = if let Some(&p) = self.funcs.get(func) {
                     p
                 } else {
                     panic!(
@@ -346,7 +357,8 @@ impl Parser {
                         self.funcs,
                     )
                 };
-                let func_call = Operator::Jsr(func_start);
+
+                let func_call = Operator::Jsr(func.to_string());
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) == self.current() {
                     if params >= 1 {
@@ -477,14 +489,6 @@ impl Parser {
             // self.add_inst_to_tail(Operator::Bra(jump_inst));
             println!("Current Total Inst before phi: {}", self.total_inst);
             // Update condition instruction
-            let loc_rhs;
-            if let Some(else_head) = self.get_current_head() {
-                loc_rhs = (cond, else_head);
-            } else {
-                self.add_inst_to_head(Operator::EMPTY);
-                loc_rhs = (cond, self.total_inst);
-            }
-            self.update_rel_op(if_key, loc_rhs);
 
             if self.cur_block_num != else_key {
                 self.connect(self.cur_block_num, fi_key);
@@ -493,21 +497,21 @@ impl Parser {
                 self.connect(else_key, fi_key);
                 phis = self.generate_phi(then_key, else_key);
             }
-            // update phi functions here for fi block
-            // TODO: identify which variable is updated
-            // find the phi function in the fi block
-            // update its RHS in phi function
+            self.switch_block(else_key);
+            let mut loc_rhs = (cond, "".to_string());
+            if let Some(else_head) = self.get_current_block_name() {
+                loc_rhs.1 = else_head;
+            }
+            self.update_rel_op(if_key, loc_rhs);
         } else {
             // (if_block, fi_block) = self.connect(if_block, fi_block);
             // let branch;
-            let loc_rhs;
-            if phis.len() > 0 {
-                loc_rhs = (cond, self.total_inst + 1);
+            self.switch_block(fi_key);
+            let loc_rhs = if let Some(block_name) = self.get_current_block_name() {
+                (cond, block_name)
             } else {
-                self.switch_block(fi_key);
-                let rhs = self.add_inst_to_head(Operator::EMPTY);
-                loc_rhs = (cond, rhs);
-            }
+                (cond, "".to_string())
+            };
             self.update_rel_op(if_key, loc_rhs);
             self.connect(if_key, fi_key);
         }
@@ -613,7 +617,9 @@ impl Parser {
 
         self.switch_block(od_key);
         self.add_inst_to_head(Operator::EMPTY);
-        self.update_rel_op(while_key, (cond, self.total_inst));
+        if let Some(block_name) = self.get_current_block_name() {
+            self.update_rel_op(while_key, (cond, block_name));
+        }
         self.move_token();
     }
     fn return_statement(&mut self) {
@@ -745,8 +751,8 @@ impl Parser {
         self.vars = global_vars;
         self.insts = HashMap::new();
         self.switch_block(func_key);
-        if let (Some(name), Some(head)) = (self.get_current_name(), self.get_current_head()) {
-            self.funcs.insert(name, (params, head));
+        if let Some(name) = self.get_current_name() {
+            self.funcs.insert(name, (params, func_key));
         }
         self.switch_block0(0);
     }
@@ -1030,7 +1036,7 @@ impl Parser {
         }
     }
 
-    fn update_rel_op(&mut self, cond_key: usize, loc_rhs: (i32, i32)) {
+    fn update_rel_op(&mut self, cond_key: usize, loc_rhs: (i32, String)) {
         if let Some(bb) = self.blocks.get(&cond_key) {
             bb.borrow_mut().fill_in_none(loc_rhs);
         }
@@ -1065,6 +1071,12 @@ impl Parser {
         }
         None
     }
+    fn get_current_block_name(&self) -> Option<String> {
+        if let Some(block) = self.blocks.get(&self.cur_block_num) {
+            return Some(block.borrow().get_block_name());
+        }
+        None
+    }
 
     fn get_current_head(&self) -> Option<i32> {
         if let Some(block) = self.blocks.get(&self.cur_block_num) {
@@ -1073,6 +1085,23 @@ impl Parser {
             }
         }
         None
+    }
+    fn get_head(&self, key: usize) -> Option<i32> {
+        if let Some(block) = self.blocks.get(&key) {
+            if let Some(h) = block.borrow().get_head_num() {
+                return Some(h);
+            }
+        }
+        None
+    }
+
+    fn is_void(&self, key: usize) -> bool {
+        if let Some(block) = self.blocks.get(&key) {
+            if matches!(block.borrow().get_tail_op(), Operator::Ret(_)) {
+                return false;
+            }
+        }
+        true
     }
 
     fn get_bb0(&self, op: &Operator) -> Option<i32> {
@@ -1511,7 +1540,7 @@ fi
         var a, b, c; {
             let a <- 1;
             let b <- a * 1;
-            let a <- a * 1;
+            let a <- a * 1 + a * 1;
             
     }.",
         );

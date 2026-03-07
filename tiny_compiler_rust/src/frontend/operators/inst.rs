@@ -48,14 +48,18 @@ impl<'a> Inst {
             | Operator::Mul(a, b)
             | Operator::Div(a, b)
             | Operator::Cmp(a, b)
-            | Operator::Phi(a, b)
-            | Operator::Bne(a, Some(b))
-            | Operator::Ble(a, Some(b))
-            | Operator::Beq(a, Some(b))
-            | Operator::Bge(a, Some(b))
-            | Operator::Bgt(a, Some(b))
-            | Operator::Blt(a, Some(b)) => {
+            | Operator::Phi(a, b) => {
                 if a == check || b == check {
+                    return true;
+                }
+            }
+            Operator::Bne(a, _)
+            | Operator::Ble(a, _)
+            | Operator::Beq(a, _)
+            | Operator::Bge(a, _)
+            | Operator::Bgt(a, _)
+            | Operator::Blt(a, _) => {
+                if a == check {
                     return true;
                 }
             }
@@ -71,8 +75,14 @@ impl<'a> Inst {
             | Operator::Mul(a, b)
             | Operator::Div(a, b)
             | Operator::Cmp(a, b)
-            | Operator::Phi(a, b)
-            | Operator::Bne(a, Some(b))
+            | Operator::Phi(a, b) => (Some(a), Some(b)),
+            _ => (None, None),
+        }
+    }
+
+    pub fn get_rel_op_data(self) -> (Option<i32>, Option<String>) {
+        match self.op {
+            Operator::Bne(a, Some(b))
             | Operator::Ble(a, Some(b))
             | Operator::Beq(a, Some(b))
             | Operator::Bge(a, Some(b))
@@ -90,6 +100,15 @@ impl<'a> Inst {
             Operator::Div(_, _) => Some(Operator::Div(updated_a, updated_b)),
             Operator::Cmp(_, _) => Some(Operator::Cmp(updated_a, updated_b)),
             Operator::Phi(_, _) => Some(Operator::Phi(updated_a, updated_b)),
+            _ => None,
+        };
+        if let Some(op) = updated_op {
+            self.op = op;
+        }
+    }
+
+    pub fn update_rel_op_insts(&mut self, updated_a: i32, updated_b: String) {
+        let updated_op = match self.op {
             Operator::Bne(_, _) => Some(Operator::Bne(updated_a, Some(updated_b))),
             Operator::Ble(_, _) => Some(Operator::Ble(updated_a, Some(updated_b))),
             Operator::Beq(_, _) => Some(Operator::Beq(updated_a, Some(updated_b))),
@@ -111,12 +130,21 @@ impl<'a> Inst {
             Operator::Div(_, b) => Some(Operator::Div(updated_a, b)),
             Operator::Cmp(_, b) => Some(Operator::Cmp(updated_a, b)),
             Operator::Phi(_, b) => Some(Operator::Phi(updated_a, b)),
-            Operator::Bne(_, b) => Some(Operator::Bne(updated_a, b)),
-            Operator::Ble(_, b) => Some(Operator::Ble(updated_a, b)),
-            Operator::Beq(_, b) => Some(Operator::Beq(updated_a, b)),
-            Operator::Bge(_, b) => Some(Operator::Bge(updated_a, b)),
-            Operator::Bgt(_, b) => Some(Operator::Bgt(updated_a, b)),
-            Operator::Blt(_, b) => Some(Operator::Blt(updated_a, b)),
+            _ => None,
+        };
+        if let Some(op) = updated_op {
+            self.op = op;
+        }
+    }
+
+    pub fn update_rel_op_inst1(&mut self, updated_a: i32) {
+        let updated_op = match &self.op {
+            Operator::Bne(_, b) => Some(Operator::Bne(updated_a, b.clone())),
+            Operator::Ble(_, b) => Some(Operator::Ble(updated_a, b.clone())),
+            Operator::Beq(_, b) => Some(Operator::Beq(updated_a, b.clone())),
+            Operator::Bge(_, b) => Some(Operator::Bge(updated_a, b.clone())),
+            Operator::Bgt(_, b) => Some(Operator::Bgt(updated_a, b.clone())),
+            Operator::Blt(_, b) => Some(Operator::Blt(updated_a, b.clone())),
             _ => None,
         };
         if let Some(op) = updated_op {
@@ -132,6 +160,15 @@ impl<'a> Inst {
             Operator::Div(a, _) => Some(Operator::Div(a, updated_b)),
             Operator::Cmp(a, _) => Some(Operator::Cmp(a, updated_b)),
             Operator::Phi(a, _) => Some(Operator::Phi(a, updated_b)),
+            _ => None,
+        };
+        if let Some(op) = updated_op {
+            self.op = op;
+        }
+    }
+
+    pub fn update_rel_op_inst2(&mut self, updated_b: String) {
+        let updated_op = match self.op {
             Operator::Bne(a, _) => Some(Operator::Bne(a, Some(updated_b))),
             Operator::Ble(a, _) => Some(Operator::Ble(a, Some(updated_b))),
             Operator::Beq(a, _) => Some(Operator::Beq(a, Some(updated_b))),
