@@ -680,6 +680,7 @@ impl Parser {
                 self.current()
             );
         }
+        self.inst_storage = InstStorage::new();
         println!("End of Var Decl {}", self.current());
     }
 
@@ -898,7 +899,7 @@ impl Parser {
         self.total_inst += 1;
         let inst_num = self.total_inst * (-1);
         let new_const = Inst::new(inst_num, op.clone());
-        let bb0 = if let Some(b) = self.blocks.get(&0) {
+        let bb0 = if let Some(b) = self.blocks.get(&self.block0_num) {
             b
         } else {
             panic!("Error: No Block Found at {}", self.cur_block_num)
@@ -1655,6 +1656,64 @@ fi
             let a <- a;
         fi;
     }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn func_func_call_test() {
+        let input = String::from(
+            "main
+    var a, b, e;
+
+    function sum(a, b, d); var c; {
+        let c <- a + d;
+        let a <- a + d; 
+        return c;
+    };
+
+    {
+    let a <- 1;
+    let b <- 2; 
+    let e <- 3;
+    call OutputNum(call sum(a, b));
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn func_while_test() {
+        let input = String::from(
+            "main
+    var a, b, e;
+
+    function sum(a, b, d); var c; {
+        while 1 == a do
+            let a <- a - 1;
+        od;
+        return c;
+    };
+
+    {
+    let a <- 2;
+    let a <- a - 1;
+    let b <- 2; 
+    let e <- 3;
+    call OutputNum(call sum(a, b));
+    }
+    .",
         );
         let mut parse = Parser::new(input);
         parse.computation();
