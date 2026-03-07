@@ -34,7 +34,7 @@ pub struct Block {
 
 impl<'a> Block {
     pub fn new(cur_num: usize, name: String, table: HashMap<String, Option<i32>>) -> Self {
-        let block_name = name.clone() + &cur_num.to_string();
+        let block_name = name.clone() + "_" + &cur_num.to_string();
 
         Self {
             block_name,

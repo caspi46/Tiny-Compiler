@@ -38,7 +38,7 @@ impl Parser {
         // }
         // let mut busy = vec![0; 32];
         // busy[0] = 1; // register 0
-        let block0 = RefCell::new(Block::new(0, "block_".to_string(), HashMap::new()));
+        let block0 = RefCell::new(Block::new(0, "block".to_string(), HashMap::new()));
         let zero_inst = Inst::new(0, Operator::Const(0));
         block0.borrow_mut().push_head(zero_inst);
         let mut blocks = BTreeMap::new();
@@ -407,7 +407,7 @@ impl Parser {
         self.total_block += 1;
         let then_block = RefCell::new(Block::new(
             self.total_block,
-            "then_".to_string(),
+            "then".to_string(),
             before_table.clone(),
         ));
         self.blocks.insert(self.total_block, then_block);
@@ -417,7 +417,7 @@ impl Parser {
         self.total_block += 1;
         let fi_block = RefCell::new(Block::new(
             self.total_block,
-            "fi_".to_string(),
+            "fi".to_string(),
             before_table.clone(),
         ));
         self.blocks.insert(self.total_block, fi_block);
@@ -458,7 +458,7 @@ impl Parser {
             println!("Current Table at Else : {:?}", before_table.clone());
             let else_block = RefCell::new(Block::new(
                 self.total_block,
-                "else_".to_string(),
+                "else".to_string(),
                 before_table,
             ));
             // (if_block, else_block) = self.connect(if_block, else_block);
@@ -527,7 +527,7 @@ impl Parser {
         let while_key = self.total_block;
         let while_block = RefCell::new(Block::new(
             self.total_block,
-            "while_".to_string(),
+            "while".to_string(),
             before_table.clone(),
         ));
         self.blocks.insert(self.total_block, while_block);
@@ -536,7 +536,7 @@ impl Parser {
         let do_key = self.total_block;
         let do_block = RefCell::new(Block::new(
             self.total_block,
-            "do_".to_string(),
+            "do".to_string(),
             before_table.clone(),
         ));
         self.blocks.insert(self.total_block, do_block);
@@ -597,7 +597,7 @@ impl Parser {
         let od_key = self.total_block;
         let od_block = RefCell::new(Block::new(
             self.total_block,
-            "od_".to_string(),
+            "od".to_string(),
             self.get_table_from_block(while_key),
         ));
 
@@ -711,7 +711,7 @@ impl Parser {
         let func_block0_key = self.total_block;
         let func_block0 = RefCell::new(Block::new(
             self.total_block,
-            "func_block0_".to_string(),
+            "func_block0".to_string(),
             HashMap::new(),
         ));
         self.blocks.insert(func_block0_key, func_block0);
@@ -777,7 +777,8 @@ impl Parser {
                     par = par1.to_string();
 
                     let par1_inst = self.add_inst_to_tail(op);
-                    self.vars.insert(par.to_string(), Some(par1_inst));
+                    self.update_table(par.to_string(), par1_inst);
+                    println!("vars : {:?}", self.vars);
                     self.move_token();
                 }
                 _ => (),
@@ -792,7 +793,7 @@ impl Parser {
                         par = par2.to_string();
 
                         let par2_inst = self.add_inst_to_tail(op);
-                        self.vars.insert(par.to_string(), Some(par2_inst));
+                        self.update_table(par.to_string(), par2_inst);
                         self.move_token();
                     }
                     _ => (),
@@ -808,7 +809,7 @@ impl Parser {
                         par = par3.to_string();
 
                         let par3_inst = self.add_inst_to_tail(op);
-                        self.vars.insert(par.to_string(), Some(par3_inst));
+                        self.update_table(par.to_string(), par3_inst);
                         self.move_token();
                     }
                     _ => (),
@@ -828,7 +829,7 @@ impl Parser {
         // so, I can check it with the existance of "void"
 
         // here
-
+        println!("Vars in func body: {:?}", self.vars);
         println!("In FuncBody: {}", self.current());
         self.var_decl();
         println!("After Func's VarDecl: {}", self.current());
@@ -863,7 +864,7 @@ impl Parser {
         println!("After Function: {}", self.current());
         self.total_block += 1;
         let main_key = self.total_block;
-        let main_block = RefCell::new(Block::new(main_key, "block_".to_string(), HashMap::new()));
+        let main_block = RefCell::new(Block::new(main_key, "block".to_string(), HashMap::new()));
         self.switch_block(self.total_block);
         self.blocks.insert(self.total_block, main_block);
 
@@ -1074,7 +1075,6 @@ impl Parser {
         None
     }
 
-    // TODO: Study Dom
     fn visualize_ir(&self) {
         println!("digraph G {{");
         for i in 0..self.total_block + 1 {
@@ -1570,6 +1570,91 @@ fi
     call OutputNum(b);
     }
     .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn nest_function() {
+        let input = String::from(
+            "main
+    var a, b, e;
+
+    function sum(a, b, d); var c; {
+        let c <- a + d;
+        return c;
+    };
+
+    function sum2(a, b); var d; {
+        let d <- a + b + call sum(a, b, d);
+    };
+
+    {
+    let a <- 1;
+    let b <- 2; 
+    let e <- 3;
+    let b <- call sum2(a, b);
+    call OutputNum(b);
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn nest_function_test2() {
+        let input = String::from(
+            "main
+    var a, b, e;
+
+    function sum(a, b, d); var c; {
+        let c <- a + d;
+        return c;
+    };
+
+    void function sum2(a, b); var d; {
+        if 1 == 2 then
+            let a <- a;
+        fi;
+    };
+
+    {
+    let a <- 1;
+    let b <- 2; 
+    let e <- 3;
+    let b <- call sum2(a, b);
+    call OutputNum(b);
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn no_need_phi_test() {
+        let input = String::from(
+            "main
+        var a; {
+            let a <- 1;
+            if 1 == 2 then
+            let a <- a;
+        fi;
+    }.",
         );
         let mut parse = Parser::new(input);
         parse.computation();
