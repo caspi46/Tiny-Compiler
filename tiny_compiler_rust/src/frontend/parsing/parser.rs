@@ -79,9 +79,8 @@ impl Parser {
         match factor_token {
             Token::Symbol(Symbol::OpenParen) => {
                 let inst_num = self.expression();
-                self.move_token();
                 if self.current() != &Token::Symbol(Symbol::CloseParen) {
-                    panic!("Error, missing closed parentheses, \")\"");
+                    panic!("Error, missing closed parentheses: {}", self.current());
                 }
                 self.move_token();
                 return inst_num;
@@ -138,7 +137,7 @@ impl Parser {
     }
     fn term(&mut self) -> i32 {
         // factor { ("*" | "/") factor }
-        let x: i32 = self.factor();
+        let mut x: i32 = self.factor();
         // self.vars.insert(x, self.total_inst);
         println!("Current token after Factor: {}", self.current());
         if self.current() != &Token::Op(MUL) && self.current() != &Token::Op(DIV) {
@@ -174,7 +173,8 @@ impl Parser {
                     div
                 };
             }
-            println!("end of the MUL&DIV loop : {}", self.current());
+            x = return_val;
+            println!("end of the MUL&DIV loop : {}", x);
         }
         // should return i32
         // i32 is the inst# that takes the calculation result
@@ -182,7 +182,7 @@ impl Parser {
     }
     fn expression(&mut self) -> i32 {
         // term { ("+" | "-") term }
-        let x = self.term(); // return the 
+        let mut x = self.term(); // return the 
         // no add or sub calculation
         // gets the same inst# as term
         // self.move_token();
@@ -206,18 +206,24 @@ impl Parser {
                 return_val = if add == expected_num {
                     let inst_num = self.add_inst_to_tail(op.clone());
                     self.insts.insert(op.clone(), inst_num);
+                    println!("Inst Num for add optimization: {}", inst_num);
                     inst_num
                 } else {
+                    println!("Inst Num for no optimization add: {}", add);
                     add
                 };
             } else if let Some(sub) = self.inst_storage.add_subs(op.clone(), expected_num) {
                 return_val = if sub == expected_num {
                     let inst_num = self.add_inst_to_tail(op.clone());
                     self.insts.insert(op, inst_num);
+                    println!("Inst Num for sub optimization: {}", inst_num);
+
                     inst_num
                 } else {
+                    println!("Inst Num for no optimization sub: {}", sub);
                     sub
                 };
+                x = return_val;
             }
         }
         return_val
@@ -1233,7 +1239,7 @@ mod tests {
         let input = String::from(
             "main
         var a; {
-            let a <- 1 - 2 / 3 - 2
+            let a <- 1 - (3 + 1) - 3;
     }.",
         );
         let mut parse = Parser::new(input);
@@ -1241,8 +1247,26 @@ mod tests {
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
 
+    #[test]
+    fn calc_test4() {
+        let input = String::from(
+            "main
+        var a, b; {
+            let a <- 1 / (3 * 1) * 3;
+            let b <- 2 / (3 * 1) * 3 - 1;
+            let b <- call InputNum() + call InputNum();
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
     #[test]
     fn func_call_test() {
         let input = String::from(
