@@ -43,10 +43,6 @@ impl Parser {
         block0.borrow_mut().push_head(zero_inst);
         let mut blocks = BTreeMap::new();
         blocks.insert(0, block0);
-        blocks.insert(
-            1,
-            RefCell::new(Block::new(1, "block_".to_string(), HashMap::new())),
-        );
 
         Self {
             tokens,
@@ -55,10 +51,10 @@ impl Parser {
             insts: HashMap::new(),
             funcs: HashMap::new(),
             cur_token_index: 0,
-            cur_block_num: 1,
+            cur_block_num: 0,
             // busy,
             total_inst: 0,
-            total_block: 1,
+            total_block: 0,
             inst_storage: InstStorage::new(),
             block0_num: 0, // block0 will be added to front at the end
         }
@@ -127,11 +123,12 @@ impl Parser {
                 self.move_token();
                 match self.current() {
                     // TODO: HAVE TO ADD THE non-void user-defined function
-                    Token::Ident(Ident::InputNum) => {
+                    Token::Ident(_) => {
                         let inst_num = self.func_call();
                         return inst_num; // Should call funcCall 
                     }
-                    _ => panic!("The RHS function does not return a value"),
+
+                    _ => panic!("Error: Invalid Function Call"),
                 }
             }
             _ => {
@@ -331,52 +328,63 @@ impl Parser {
                     panic!("Errorr: no opened parenthesis");
                 }
             }
+
             Token::Ident(UserDefined(func)) => {
-                let func_call = Operator::Jsr(func.clone());
                 let (params, func_start) = if let Some(&p) = self.funcs.get(func) {
                     p
                 } else {
-                    panic!("Error: Invalid Function Format")
+                    panic!(
+                        "Error: Invalid Function Format: {}\nFunc:{}\nFuncs:{:?}",
+                        self.current(),
+                        func,
+                        self.funcs,
+                    )
                 };
+                let func_call = Operator::Jsr(func_start);
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) == self.current() {
                     if params >= 1 {
+                        // self.move_token();
                         let param1 = self.expression();
                         let set_param1 = Operator::SetPar1(param1);
                         let inst_num = self.add_inst_to_tail(set_param1.clone());
                         self.insts.insert(set_param1, inst_num);
+                    }
 
-                        self.move_token();
-                        if self.current() != &Token::Symbol(Symbol::Comma) {
-                            panic!("Error: Missing Comma for Parameter in FuncCall");
+                    println!("After Param1 Check: {}", self.current());
+
+                    if self.current() == &Token::Symbol(Symbol::Comma) {
+                        println!("Entered for 2nd params: {}", self.current());
+                        if params >= 2 {
+                            // self.move_token();
+                            let param2 = self.expression();
+                            let set_param2 = Operator::SetPar2(param2);
+                            let inst_num = self.add_inst_to_tail(set_param2.clone());
+                            self.insts.insert(set_param2, inst_num);
                         }
                     }
-                    if params >= 2 {
-                        self.move_token();
-                        let param2 = self.expression();
-                        let set_param2 = Operator::SetPar2(param2);
-                        let inst_num = self.add_inst_to_tail(set_param2.clone());
-                        self.insts.insert(set_param2, inst_num);
-                        if self.current() != &Token::Symbol(Symbol::Comma) {
-                            panic!("Error: Missing Comma for Parameter in FuncCall");
+                    println!("Finished 2nd params: {}", self.current());
+                    if self.current() == &Token::Symbol(Symbol::Comma) {
+                        if params == 3 {
+                            let param3 = self.expression();
+                            let set_param3 = Operator::SetPar3(param3);
+                            let inst_num = self.add_inst_to_tail(set_param3.clone());
+                            self.insts.insert(set_param3, inst_num);
                         }
-                    }
-                    if params == 3 {
-                        self.move_token();
-                        let param3 = self.expression();
-                        let set_param3 = Operator::SetPar2(param3);
-                        let inst_num = self.add_inst_to_tail(set_param3.clone());
-                        self.insts.insert(set_param3, inst_num);
                     }
                     if params > 3 {
                         panic!("Error: More than 3 Parameter for Function");
                     }
-                    self.move_token();
                     if &Token::Symbol(Symbol::CloseParen) != self.current() {
-                        panic!("Error: Missing Closed Parenthesis for function call");
+                        panic!(
+                            "Error: Missing Closed Parenthesis for function call: {}",
+                            self.current()
+                        );
                     }
                     let inst_num = self.add_inst_to_tail(func_call.clone());
                     self.insts.insert(func_call, inst_num);
+                    println!("End of Func Call: {}", self.current());
+                    self.move_token();
                     self.total_inst
                 } else {
                     panic!("Error: Missing Opened Paranthesis");
@@ -604,8 +612,10 @@ impl Parser {
     }
     fn return_statement(&mut self) {
         // "return" [ expression ]
-        self.move_token();
-        self.expression();
+        println!("In Return: {}", self.current());
+        let return_var = self.expression();
+        let return_op = Operator::Ret(return_var);
+        let return_inst = self.add_inst_to_tail(return_op);
     }
     fn statement(&mut self) {
         // statement {";" statement } [";"]
@@ -731,6 +741,7 @@ impl Parser {
         if let (Some(name), Some(head)) = (self.get_current_name(), self.get_current_head()) {
             self.funcs.insert(name, (params, head));
         }
+        self.switch_block0(0);
     }
     fn formal_param(&mut self) -> usize {
         // return # of parameters will be nice
@@ -849,6 +860,12 @@ impl Parser {
             self.func_decl();
             self.move_token();
         }
+        println!("After Function: {}", self.current());
+        self.total_block += 1;
+        let main_key = self.total_block;
+        let main_block = RefCell::new(Block::new(main_key, "block_".to_string(), HashMap::new()));
+        self.switch_block(self.total_block);
+        self.blocks.insert(self.total_block, main_block);
 
         if self.current() != &Token::Symbol(Symbol::OpenBrace) {
             panic!("Error: Missing Opened Brace for Main");
@@ -870,7 +887,7 @@ impl Parser {
             );
         }
         // self.blocks.push(block);
-        self.connect(0, 1);
+        self.connect(0, main_key);
     }
 
     /// helper functions to add instruction to the current block
@@ -1036,7 +1053,7 @@ impl Parser {
 
     fn get_current_name(&self) -> Option<String> {
         if let Some(block) = self.blocks.get(&self.cur_block_num) {
-            return Some(block.borrow().get_block_name());
+            return Some(block.borrow().get_func_name());
         }
         None
     }
@@ -1505,5 +1522,60 @@ fi
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn two_param_test() {
+        let input = String::from(
+            "main
+    var a, b;
+
+    function sum(a, b); var c; {
+        let c <- a;
+        return c;
+    };
+
+    {
+    let a <- 1;
+    let b <- call sum(a, b);
+    call OutputNum(b);
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn three_param_test() {
+        let input = String::from(
+            "main
+    var a, b, e;
+
+    function sum(a, b, d); var c; {
+        let c <- a + d;
+        return c;
+    };
+
+    {
+    let a <- 1;
+    let b <- 2; 
+    let e <- 3;
+    let b <- call sum(a, b, e);
+    call OutputNum(b);
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
     }
 }

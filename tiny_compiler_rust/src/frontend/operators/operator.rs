@@ -29,7 +29,7 @@ pub enum Operator {
     Write(i32),
     WriteNL,
     // Operator for user-defined functions
-    Jsr(String), // block name
+    Jsr(i32), // block name
     Ret(i32),
     // For now, only three parameters
     GetPar1,

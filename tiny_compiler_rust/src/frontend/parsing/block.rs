@@ -23,6 +23,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Block {
     block_name: String,
+    name: String,
     block_num: usize,
     insts: VecDeque<Inst>,
     table: HashMap<String, Option<i32>>,
@@ -33,10 +34,11 @@ pub struct Block {
 
 impl<'a> Block {
     pub fn new(cur_num: usize, name: String, table: HashMap<String, Option<i32>>) -> Self {
-        let block_name = name + &cur_num.to_string();
+        let block_name = name.clone() + &cur_num.to_string();
 
         Self {
             block_name,
+            name,
             block_num: cur_num,
             insts: VecDeque::new(),
             table: table,
@@ -54,6 +56,10 @@ impl<'a> Block {
 
     pub fn get_block_name(&self) -> String {
         self.block_name.clone()
+    }
+
+    pub fn get_func_name(&self) -> String {
+        self.name.clone()
     }
 
     /// add_next
