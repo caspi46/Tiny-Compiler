@@ -17,7 +17,8 @@ pub struct Parser {
     blocks: BTreeMap<usize, RefCell<Block>>,
     vars: HashMap<String, Option<i32>>,
     insts: HashMap<Operator, i32>,
-    funcs: HashMap<String, (usize, usize)>,
+    funcs: HashMap<String, usize>,
+    void_funcs: Vec<String>,
     cur_token_index: usize,
     // cur_block: &'a RefCell<Block>,
     cur_block_num: usize,
@@ -50,6 +51,7 @@ impl Parser {
             vars: HashMap::new(),
             insts: HashMap::new(),
             funcs: HashMap::new(),
+            void_funcs: Vec::new(),
             cur_token_index: 0,
             cur_block_num: 0,
             total_inst: 0,
@@ -122,16 +124,11 @@ impl Parser {
                 match self.current() {
                     // TODO: HAVE TO ADD THE non-void user-defined function
                     Token::Ident(Ident::UserDefined(func)) => {
-                        if let Some(func_info) = self.funcs.get(func) {
-                            if self.is_void(func_info.1) {
-                                panic!(
-                                    "Error: Invalid Function Call. The function must has return value"
-                                );
-                            }
-                            let inst_num = self.func_call();
-                            return inst_num;
+                        if self.void_funcs.contains(func) {
+                            panic!("Error: Void function detected in assignment");
                         }
-                        panic!("Error: Invalid Function Call");
+                        let inst_num = self.func_call();
+                        return inst_num;
                     }
                     Token::Ident(_) => {
                         let inst_num = self.func_call();
@@ -240,7 +237,7 @@ impl Parser {
         return_val
         // return the i32 value for that takes the calculation for example: add (1) (2) -> (1)
     }
-    fn relation(&mut self) -> (i32, i32) {
+    fn relation(&mut self) -> i32 {
         // should return
         // // expression relOp expression]
         // self.move_token();
@@ -263,7 +260,7 @@ impl Parser {
                 panic!("Error, missing relOp: ==, !=, >, <, >=, <=");
             }
         };
-        (cmp, rel_inst)
+        rel_inst
     }
     fn assignment(&mut self) -> i32 {
         // "let" ident "<-"  expression
@@ -347,7 +344,7 @@ impl Parser {
             }
 
             Token::Ident(UserDefined(func)) => {
-                let (params, _) = if let Some(&p) = self.funcs.get(func) {
+                let params = if let Some(&p) = self.funcs.get(func) {
                     p
                 } else {
                     panic!(
@@ -446,7 +443,7 @@ impl Parser {
         // add insts in if block
         // self.switch_block(if_key);
         // self.move_token();
-        let (cmp, cond) = self.relation(); // if_block saved them already
+        let cond = self.relation(); // if_block saved them already
         println!("Current Token after IF: {}", self.current());
 
         if self.current() != &Token::Then {
@@ -560,7 +557,7 @@ impl Parser {
         self.set_dom(while_key, do_key);
 
         self.switch_block(while_key);
-        let (_, cond) = self.relation();
+        let cond = self.relation();
         if self.current() != &Token::Do {
             panic!("Error: Invalid While Statement Format, Missing \"do\"");
         }
@@ -719,6 +716,9 @@ impl Parser {
             Token::Ident(UserDefined(func)) => func.clone(),
             _ => panic!("Error: Missing function name: Ident(_)"),
         };
+        if is_void {
+            self.void_funcs.push(func_name.clone());
+        }
 
         self.total_block += 1;
         let func_block0_key = self.total_block;
@@ -742,6 +742,12 @@ impl Parser {
             println!("Going to Func Body");
             self.move_token();
             self.func_body();
+            if is_void != self.is_void(self.cur_block_num) {
+                panic!(
+                    "Error: not matching the function type and return type: {}",
+                    self.current()
+                );
+            }
         } else {
             panic!("Error: Missing Semicolon for formal param");
         }
@@ -752,7 +758,7 @@ impl Parser {
         self.insts = HashMap::new();
         self.switch_block(func_key);
         if let Some(name) = self.get_current_name() {
-            self.funcs.insert(name, (params, func_key));
+            self.funcs.insert(name, params);
         }
         self.switch_block0(0);
     }
@@ -1634,72 +1640,6 @@ fi
     }
 
     #[test]
-    fn nest_function() {
-        let input = String::from(
-            "main
-    var a, b, e;
-
-    function sum(a, b, d); var c; {
-        let c <- a + d;
-        return c;
-    };
-
-    function sum2(a, b); var d; {
-        let d <- a + b + call sum(a, b, d);
-    };
-
-    {
-    let a <- 1;
-    let b <- 2; 
-    let e <- 3;
-    let b <- call sum2(a, b);
-    call OutputNum(b);
-    }
-    .",
-        );
-        let mut parse = Parser::new(input);
-        parse.computation();
-        parse.show_vars();
-        parse.show_insts();
-        parse.show_blocks();
-        parse.visualize_ir();
-    }
-
-    #[test]
-    fn nest_function_test2() {
-        let input = String::from(
-            "main
-    var a, b, e;
-
-    function sum(a, b, d); var c; {
-        let c <- a + d;
-        return c;
-    };
-
-    void function sum2(a, b); var d; {
-        if 1 == 2 then
-            let a <- a;
-        fi;
-    };
-
-    {
-    let a <- 1;
-    let b <- 2; 
-    let e <- 3;
-    let b <- call sum2(a, b);
-    call OutputNum(b);
-    }
-    .",
-        );
-        let mut parse = Parser::new(input);
-        parse.computation();
-        parse.show_vars();
-        parse.show_insts();
-        parse.show_blocks();
-        parse.visualize_ir();
-    }
-
-    #[test]
     fn no_need_phi_test() {
         let input = String::from(
             "main
@@ -1764,7 +1704,79 @@ fi
     let a <- a - 1;
     let b <- 2; 
     let e <- 3;
-    call OutputNum(call sum(a, b));
+    let a <- call sum(a, b);
+    call OutputNum(a);
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    #[should_panic]
+    fn detect_void_assignment() {
+        let input = String::from(
+            "main
+    var a, b, e;
+
+    function sum(a, b, d); var c; {
+        let c <- a + d;
+        return c;
+    };
+
+    function sum2(a, b); var d; {
+        let d <- a + b + call sum(a, b, d);
+    };
+
+    {
+    let a <- 1;
+    let b <- 2; 
+    let e <- 3;
+    let b <- call sum2(a, b);
+    call OutputNum(b);
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    // true positive tests
+    // for user-defined functions
+    #[test]
+    #[should_panic]
+    fn different_func_return_type() {
+        let input = String::from(
+            "main
+    var a, b, e;
+
+    function sum(a, b, d); var c; {
+        let c <- a + d;
+        return c;
+    };
+
+    void function sum2(a, b); var d; {
+        if 1 == 2 then
+            let a <- a;
+        fi;
+        return a;
+    };
+
+    {
+    let a <- 1;
+    let b <- 2; 
+    let e <- 3;
+    let b <- call sum2(a, b);
+    call OutputNum(b);
     }
     .",
         );
