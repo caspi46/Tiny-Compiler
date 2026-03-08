@@ -7,10 +7,35 @@ use crate::frontend::fsm::{
 };
 use crate::frontend::operators::{Inst, InstStorage, Operator};
 use crate::frontend::parsing::block::Block;
-// use crate::frontend::parsing::result::{Kind, Result};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 
+/// Parser Struct:
+///
+/// tokens: Token list from Tokenizer
+///
+/// blocks: Block list
+///
+/// vars: global variable list (In this project, only consider global variables)
+///       and variables in function (will be deleted after parsing user defined functions)
+///
+/// insts: instruction list
+///
+/// funcs: function list
+///
+/// void_funcs: void function list to identify function call's return type existance
+///
+/// cur_token_index: current token index
+///
+/// cur_block_num: current block key
+///
+/// block0_num: current block0 key
+///
+/// total_inst: total number of instructions
+///
+/// total_block: total number of blocks
+///
+/// inst_storage: instruction storage for optimization
 #[derive()]
 pub struct Parser {
     tokens: Vec<Token>,
@@ -20,9 +45,7 @@ pub struct Parser {
     funcs: HashMap<String, usize>,
     void_funcs: Vec<String>,
     cur_token_index: usize,
-    // cur_block: &'a RefCell<Block>,
     cur_block_num: usize,
-    // busy: Vec<i32>,
     block0_num: usize,
     total_inst: i32,
     total_block: usize,
@@ -30,15 +53,13 @@ pub struct Parser {
 }
 
 impl Parser {
+    /// new (constructor)
+    ///
+    /// input: String (Source Code)
     pub fn new(input: String) -> Self {
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
         let tokens = tokenizer.get_tokens();
-        // if tokens.len() < 0 {
-        //     panic!("No User Input/Toeken");
-        // }
-        // let mut busy = vec![0; 32];
-        // busy[0] = 1; // register 0
         let block0 = RefCell::new(Block::new(0, "block".to_string(), HashMap::new()));
         let zero_inst = Inst::new(0, Operator::Const(0));
         block0.borrow_mut().push_head(zero_inst);
@@ -60,6 +81,10 @@ impl Parser {
             block0_num: 0, // block0 will be added to front at the end
         }
     }
+
+    /// current function:
+    ///
+    /// return the current token
     fn current(&self) -> &Token {
         if self.cur_token_index == self.tokens.len() {
             panic!("Error: Out of range");
@@ -67,17 +92,52 @@ impl Parser {
         &self.tokens[self.cur_token_index]
     }
 
+    /// move_token function:
+    ///
+    /// increase current token index and
+    /// move the next token
     fn move_token(&mut self) {
         self.cur_token_index += 1;
     }
 
+    /// factor:
+    ///
+    /// ident | number | "(" expression ")" | funcCall
+    ///
+    /// identifies the type and value of the current token
+    /// and generate the instruction based on the information
+    ///
+    /// case 1: (
+    ///     call expression to identify inside of the parantehsis
+    ///     must have the closed paranethesis at the end (after expression)
+    ///
+    /// case 2: Number
+    ///     identifies if the block0 (const value container) already has the instruction for the number
+    ///
+    ///     if not: generate new instruction for the number and return the instruction number
+    ///
+    ///     if so: return the existing instruction number
+    ///
+    /// case 3: Ident (Variable)
+    ///     identifies if the variable is initialized already by looking at current block's table
+    ///  
+    ///     if not: warn that it is not initialized and return 0 which means the variable is 0
+    ///  
+    ///     if so: return the existing instruction number
+    ///
+    /// case 4: Function call
+    ///     Identify if the function is user-defined
+    ///   
+    ///     if not: move onto the function call function (func_call)
+    ///   
+    ///     if so: check if it's a void or not. It must be non-void function
+    ///            and move onto the function call (func_call)
     fn factor(&mut self) -> i32 {
-        // return: i32
-        // ident | number | "(" expression ")" | funcCall
         self.move_token();
         println!("Factor's current Token: {}", self.current());
         let factor_token = self.current().clone();
         match factor_token {
+            // ( )
             Token::Symbol(Symbol::OpenParen) => {
                 let inst_num = self.expression();
                 if self.current() != &Token::Symbol(Symbol::CloseParen) {
@@ -86,9 +146,8 @@ impl Parser {
                 self.move_token();
                 return inst_num;
             }
+            // number
             Token::Number(num) => {
-                // add num value in block 0
-
                 let op = Operator::Const(num);
                 self.move_token();
                 if let Some(i_num) = self.get_bb0(&op) {
@@ -99,10 +158,8 @@ impl Parser {
                 println!("Num's Token: {}", inst_num);
                 return inst_num;
             }
+            // variable
             Token::Ident(UserDefined(var)) => {
-                // user-defined variable
-                //
-                // if the variable is already initialized to other var in the table
                 self.move_token();
                 let cur_block = if let Some(b) = self.blocks.get(&self.total_block) {
                     b
@@ -117,12 +174,12 @@ impl Parser {
                     0
                 }
             }
+            // function call
             Token::Call => {
-                // skip for now (maybe after I solve the ident and num)
                 println!("Factor is Call");
                 self.move_token();
                 match self.current() {
-                    // TODO: HAVE TO ADD THE non-void user-defined function
+                    // user-defined function
                     Token::Ident(Ident::UserDefined(func)) => {
                         if self.void_funcs.contains(func) {
                             panic!("Error: Void function detected in assignment");
@@ -130,11 +187,11 @@ impl Parser {
                         let inst_num = self.func_call();
                         return inst_num;
                     }
+                    // predefined function
                     Token::Ident(_) => {
                         let inst_num = self.func_call();
                         return inst_num; // Should call funcCall 
                     }
-
                     _ => panic!("Error: Invalid Function Call"),
                 }
             }
@@ -143,10 +200,12 @@ impl Parser {
             }
         }
     }
+
+    /// term:
+    ///
+    /// factor { ("*" | "/") factor }
     fn term(&mut self) -> i32 {
-        // factor { ("*" | "/") factor }
         let mut x: i32 = self.factor();
-        // self.vars.insert(x, self.total_inst);
         println!("Current token after Factor: {}", self.current());
         if self.current() != &Token::Op(MUL) && self.current() != &Token::Op(DIV) {
             return x;
@@ -154,7 +213,6 @@ impl Parser {
         let mut return_val = x;
         let mut calc;
         while self.current() == &Token::Op(MUL) || self.current() == &Token::Op(DIV) {
-            println!("Current Token at MUL&DIV loop: {}", self.current());
             calc = self.current().clone();
             let y = self.factor();
             let op = match calc {
@@ -182,20 +240,16 @@ impl Parser {
                 };
             }
             x = return_val;
-            println!("end of the MUL&DIV loop : {}", x);
         }
-        // should return i32
-        // i32 is the inst# that takes the calculation result
         return_val
     }
+
+    /// expression:
+    ///
+    /// term { ("+" | "-") term }
     fn expression(&mut self) -> i32 {
-        // term { ("+" | "-") term }
-        let mut x = self.term(); // return the 
-        // no add or sub calculation
-        // gets the same inst# as term
-        // self.move_token();
+        let mut x = self.term();
         if self.current() != &Token::Op(ADD) && self.current() != &Token::Op(SUB) {
-            // self.move_token();
             return x;
         }
         let mut calc;
@@ -235,17 +289,15 @@ impl Parser {
             }
         }
         return_val
-        // return the i32 value for that takes the calculation for example: add (1) (2) -> (1)
     }
+
+    /// relation:
+    ///
+    /// expression relOp expression
     fn relation(&mut self) -> i32 {
-        // should return
-        // // expression relOp expression]
-        // self.move_token();
         println!("Current Token in Relation: {}", self.current());
-        let lhs = self.expression(); // first in RelOp (v1, v2)
-        // while matches!(self.current(), &Token::RelOp(_)) {
+        let lhs = self.expression();
         print!("Current Token after LHS in relation: {}", self.current());
-        // }
         let rel_op = self.current().clone();
         let rhs = self.expression();
         let cmp = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
@@ -262,8 +314,11 @@ impl Parser {
         };
         rel_inst
     }
+
+    /// assignment:
+    ///
+    /// "let" ident "<-"  expression
     fn assignment(&mut self) -> i32 {
-        // "let" ident "<-"  expression
         self.move_token();
 
         let var = match self.current() {
@@ -288,12 +343,13 @@ impl Parser {
         rhs
     }
 
+    /// func_call
+    ///
+    /// "call" ident [ "(" [expression {"," expression}] ")"]
     fn func_call(&mut self) -> i32 {
-        // "call" ident [ "(" [expression {"," expression}] ")"]
-        // self.move_token();
         match self.current() {
+            // InputNum(): no parameter
             Token::Ident(Ident::InputNum) => {
-                // no parameter
                 let op = Operator::Read;
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) != self.current() {
@@ -308,6 +364,7 @@ impl Parser {
                 self.move_token();
                 self.total_inst
             }
+            // OutputNewLine(): no parameter
             Token::Ident(Ident::OutputNewLine) => {
                 // no parameter
                 let op = Operator::WriteNL;
@@ -325,6 +382,7 @@ impl Parser {
                 self.move_token();
                 self.total_inst
             }
+            // OutputNum(x): one parameter
             Token::Ident(Ident::OutputNum) => {
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) == self.current() {
@@ -342,7 +400,7 @@ impl Parser {
                     panic!("Errorr: no opened parenthesis");
                 }
             }
-
+            // User-defined function
             Token::Ident(UserDefined(func)) => {
                 let params = if let Some(&p) = self.funcs.get(func) {
                     p
@@ -359,26 +417,20 @@ impl Parser {
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) == self.current() {
                     if params >= 1 {
-                        // self.move_token();
                         let param1 = self.expression();
                         let set_param1 = Operator::SetPar1(param1);
                         let inst_num = self.add_inst_to_tail(set_param1.clone());
                         self.insts.insert(set_param1, inst_num);
                     }
 
-                    println!("After Param1 Check: {}", self.current());
-
                     if self.current() == &Token::Symbol(Symbol::Comma) {
-                        println!("Entered for 2nd params: {}", self.current());
                         if params >= 2 {
-                            // self.move_token();
                             let param2 = self.expression();
                             let set_param2 = Operator::SetPar2(param2);
                             let inst_num = self.add_inst_to_tail(set_param2.clone());
                             self.insts.insert(set_param2, inst_num);
                         }
                     }
-                    println!("Finished 2nd params: {}", self.current());
                     if self.current() == &Token::Symbol(Symbol::Comma) {
                         if params == 3 {
                             let param3 = self.expression();
@@ -398,7 +450,6 @@ impl Parser {
                     }
                     let inst_num = self.add_inst_to_tail(func_call.clone());
                     self.insts.insert(func_call, inst_num);
-                    println!("End of Func Call: {}", self.current());
                     self.move_token();
                     self.total_inst
                 } else {
@@ -408,13 +459,11 @@ impl Parser {
             _ => panic!("Error: Invalid funcCall format"),
         }
     }
-    fn if_statement(&mut self) {
-        // "if" relation "then" statSequence ["else" statSequence] "fi"
-        // new block: if, then, else, fi
 
-        // new blocks! IF, THEN, FI
-        // if block
-        // self.total_block += 1;
+    /// if_statement
+    ///
+    /// "if" relation "then" statSequence ["else" statSequence] "fi"
+    fn if_statement(&mut self) {
         let before_table = self.vars.clone();
         let if_key = self.cur_block_num;
 
@@ -439,20 +488,17 @@ impl Parser {
         self.blocks.insert(self.total_block, fi_block);
         let fi_key = self.total_block;
         self.set_dom(if_key, fi_key);
-        // (if_block, then_block) = self.connect(if_block, then_block);
 
-        // add insts in if block
-        // self.switch_block(if_key);
-        // self.move_token();
-        let cond = self.relation(); // if_block saved them already
-        println!("Current Token after IF: {}", self.current());
+        // conditional statement
+        let cond = self.relation();
 
         if self.current() != &Token::Then {
             panic!("Error: Invalid If Statement Format, Missing \"then\"");
         }
-        // (then_block, fi_block) = self.connect(then_block, fi_block);
+
+        // then block check
         self.switch_block(then_key);
-        self.stat_sequence(); // add all the instructions in the then to the then block
+        self.stat_sequence();
         self.connect(if_key, then_key);
         self.set_dom(if_key, then_key);
 
@@ -465,9 +511,8 @@ impl Parser {
             self.connect(then_key, fi_key);
             phis = self.generate_phi(if_key, then_key);
         }
-        // create phi functioins here for fi block (LEFT in Phi(Left, Right))
-        println!("Current Token after THEN: {}", self.current());
 
+        // else block check
         if self.current() == &Token::Else {
             // since else is optional
             self.total_block += 1;
@@ -477,16 +522,14 @@ impl Parser {
                 "else".to_string(),
                 before_table,
             ));
-            // (if_block, else_block) = self.connect(if_block, else_block);
             self.blocks.insert(self.total_block, else_block);
             let else_key = self.total_block;
             self.connect(if_key, else_key);
             self.set_dom(if_key, else_key);
             self.switch_block(else_key);
             self.stat_sequence();
-            // self.add_inst_to_tail(Operator::Bra(jump_inst));
-            println!("Current Total Inst before phi: {}", self.total_inst);
-            // Update condition instruction
+
+            // phi function check
             if self.cur_block_num != else_key {
                 self.connect(self.cur_block_num, fi_key);
                 phis = self.generate_phi(self.cur_block_num, else_key);
@@ -494,22 +537,24 @@ impl Parser {
                 self.connect(else_key, fi_key);
                 phis = self.generate_phi(then_key, else_key);
             }
+            // add branch call instruction
             self.add_inst_to_tail(Operator::Bra(fi_block_name));
             self.switch_block(else_key);
             let mut loc_rhs = (cond, "".to_string());
             if let Some(else_name) = self.get_current_block_name() {
                 loc_rhs.1 = else_name;
             }
+            // Update condition instruction
             self.update_rel_op(if_key, loc_rhs);
         } else {
-            // (if_block, fi_block) = self.connect(if_block, fi_block);
-            // let branch;
+            // no else block
             self.switch_block(fi_key);
             let loc_rhs = if let Some(block_name) = self.get_current_block_name() {
                 (cond, block_name)
             } else {
                 (cond, "".to_string())
             };
+            // update condition instruction
             self.update_rel_op(if_key, loc_rhs);
             self.connect(if_key, fi_key);
         }
@@ -517,7 +562,8 @@ impl Parser {
         if self.current() != &Token::Fi {
             panic!("Error: Invalid If Statement Format, Missing \"fi\"");
         }
-        println!("Current Total Inst:{}", self.total_inst);
+
+        // add phi function instruction(s)
         self.switch_block(fi_key);
         for (var, phi) in phis {
             let phi_op = Operator::Phi(phi.0, phi.1);
@@ -525,12 +571,14 @@ impl Parser {
             self.update_table(var, inst_num);
         }
         self.move_token();
-        // add phi functions if exists
     }
+
+    /// while_statement
+    /// "while" relaton "do" StatSequence "od"
     fn while_statement(&mut self) {
-        // "while" relaton "do" StatSequence "od"
-        // new block: while, then
         let before_table = self.vars.clone();
+
+        // while block
         self.total_block += 1;
         let while_key = self.total_block;
         let while_block = RefCell::new(Block::new(
@@ -540,6 +588,7 @@ impl Parser {
         ));
         self.blocks.insert(self.total_block, while_block);
 
+        // do block
         self.total_block += 1;
         let do_key = self.total_block;
         let do_block = RefCell::new(Block::new(
@@ -553,17 +602,22 @@ impl Parser {
         self.connect(self.cur_block_num, while_key);
         self.connect(while_key, do_key);
 
-        // doms
+        // Doms
         self.set_dom(self.cur_block_num, while_key);
         self.set_dom(while_key, do_key);
 
+        // conditional statement
         self.switch_block(while_key);
         let cond = self.relation();
         if self.current() != &Token::Do {
             panic!("Error: Invalid While Statement Format, Missing \"do\"");
         }
+
+        // do check
         self.switch_block(do_key);
         self.stat_sequence();
+
+        // generate phi function(s)
         let phis;
         if self.cur_block_num == do_key {
             self.connect(do_key, while_key);
@@ -575,12 +629,13 @@ impl Parser {
         if self.current() != &Token::Od {
             panic!("Error: Invalid While Statement Format, Missing \"od\"");
         }
-        // phi instructions
+
+        // format phi function information
+        // add phi function instructions to while block
         self.switch_block(while_key);
         let mut ori_to_new = HashMap::new();
         let mut var_to_phi = HashMap::new();
         let mut phi_insts = Vec::new();
-        // let mut choices = Vec::new();
         for (var, phi) in phis {
             self.total_inst += 1;
             let phi_op = Operator::Phi(phi.0, phi.1);
@@ -601,6 +656,7 @@ impl Parser {
             cur_block.borrow_mut().push_head(inst);
         }
 
+        // od block
         self.total_block += 1;
         let od_key = self.total_block;
         let od_block = RefCell::new(Block::new(
@@ -613,62 +669,77 @@ impl Parser {
         self.connect(while_key, od_key);
         self.set_dom(while_key, od_key);
 
+        // update condition instruction
         self.switch_block(od_key);
         if let Some(block_name) = self.get_current_block_name() {
             self.update_rel_op(while_key, (cond, block_name));
         }
         self.move_token();
     }
+
+    /// return_statement
+    ///
+    /// "return" [ expression ]
     fn return_statement(&mut self) {
-        // "return" [ expression ]
-        println!("In Return: {}", self.current());
         let return_var = self.expression();
         let return_op = Operator::Ret(return_var);
         self.add_inst_to_tail(return_op);
     }
 
+    /// statement
+    ///
+    /// assignment | funcCall | ifStatement | whileStatement | returnStatement
     fn statement(&mut self) {
-        // statement {";" statement } [";"]
-        // placeholder for now
-        // each function should return i32 value (inst#) like func_call
         self.move_token();
         match &self.current() {
+            // assignment
             Token::Let => {
                 self.assignment();
             }
+
+            // function call
             Token::Call => {
                 self.move_token();
                 self.func_call();
             }
+
+            // if statement
             Token::If => {
                 self.if_statement();
             }
+
+            // while statement
             Token::While => {
                 self.while_statement();
             }
+
+            // return statement
             Token::Return => {
                 self.return_statement();
             }
+
+            // other acceptable cases (to skip)
             Token::Symbol(Symbol::CloseBrace) | Token::Fi | Token::Else | Token::Od => (),
             _ => panic!("Error: Invalid Statement format: {}", self.current()),
         };
     }
+
+    /// stat_sequence
+    ///
+    /// statement { ";" statement } [";"]
+    ///
+    /// I decided the design choice that all statement must have ";"
     fn stat_sequence(&mut self) {
-        // assignment | funcCall | ifStatement | whileStatement | returnStatement
         self.statement();
-        println!("Current Token at StatSequence: {}", self.current());
         while self.current() == &Token::Symbol(Symbol::SemiColon) {
-            println!(
-                "In While loop: StatSequence\nCurrent Token:{}",
-                self.current()
-            );
             self.statement();
         }
     }
 
+    /// var_decl
+    ///
+    /// "var" ident {"," ident} ";"
     fn var_decl(&mut self) {
-        // "var" ident {"," ident} ";"
-        println!("Current Token at VarDecl: {}", self.current());
         self.move_token();
         match self.current() {
             Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), None),
@@ -677,7 +748,6 @@ impl Parser {
         self.move_token();
         while self.current() == &Token::Symbol(Symbol::Comma) {
             self.move_token();
-            // check if the token type is identifier (Ident)
             match self.current() {
                 Token::Ident(UserDefined(var)) => self.vars.insert(var.to_string(), None),
                 _ => panic!("Error: Invalid VarDecl Format - Missing Variable Name after Comma"),
@@ -691,17 +761,16 @@ impl Parser {
             );
         }
         self.inst_storage = InstStorage::new();
-        println!("End of Var Decl {}", self.current());
     }
 
-    // TODO: TEST
+    /// func_decl
+    ///
+    /// ["void"] "function" ident formalParam ";" funcBody ";"
     fn func_decl(&mut self) {
-        // ["void"] "function" ident formalParam ";" funcBody ";"
-        // new block for bb0
-        // new block for start
+        // prevent from corrupting the variable hash map
         let global_vars = self.vars.clone();
-        // self.move_token();
-        // this tells that the function must have return value or not
+
+        // void status
         let is_void = if self.current() == &Token::Void {
             self.move_token();
             true
@@ -717,10 +786,13 @@ impl Parser {
             Token::Ident(UserDefined(func)) => func.clone(),
             _ => panic!("Error: Missing function name: Ident(_)"),
         };
+
+        // void check
         if is_void {
             self.void_funcs.push(func_name.clone());
         }
 
+        // block0 for the user-defined function
         self.total_block += 1;
         let func_block0_key = self.total_block;
         let func_block0 = RefCell::new(Block::new(
@@ -731,6 +803,7 @@ impl Parser {
         self.blocks.insert(func_block0_key, func_block0);
         self.switch_block0(func_block0_key);
 
+        // initial block for user-defined function
         self.total_block += 1;
         let func_key = self.total_block;
         let func_block = RefCell::new(Block::new(self.total_block, func_name, HashMap::new()));
@@ -738,6 +811,8 @@ impl Parser {
         self.switch_block(func_key);
 
         self.connect(func_block0_key, func_key);
+
+        // parameters & function body
         let params = self.formal_param();
         if self.current() == &Token::Symbol(Symbol::SemiColon) {
             println!("Going to Func Body");
@@ -755,6 +830,8 @@ impl Parser {
         if self.current() != &Token::Symbol(Symbol::SemiColon) {
             panic!("Error: Missing Semicolon for func body");
         }
+
+        // back up
         self.vars = global_vars;
         self.insts = HashMap::new();
         self.switch_block(func_key);
@@ -763,11 +840,14 @@ impl Parser {
         }
         self.switch_block0(0);
     }
-    fn formal_param(&mut self) -> usize {
-        // return # of parameters will be nice
-        // "( [ident {"," ident}] ")"
-        // getPar insts! TODO: Fix the format below. No loop, but check
 
+    /// formal_param
+    ///
+    ///  "( [ident {"," ident}] ")"
+    ///
+    /// return # of parameters
+    fn formal_param(&mut self) -> usize {
+        // may need to change (if max # of parameters is not 3)
         let mut params = 0;
         self.move_token();
         if self.current() == &Token::Symbol(Symbol::OpenParen) {
@@ -843,45 +923,49 @@ impl Parser {
         }
         return params;
     }
-    fn func_body(&mut self) {
-        // [varDecl] "{" [statSequence] "}"
-        // I'm thinking that the return value must be the return inst or none
-        // so, I can check it with the existance of "void"
 
-        // here
-        println!("Vars in func body: {:?}", self.vars);
-        println!("In FuncBody: {}", self.current());
+    /// func_body
+    ///
+    /// [varDecl] "{" [statSequence] "}"
+    fn func_body(&mut self) {
+        // variable for the user-defined function
         self.var_decl();
-        println!("After Func's VarDecl: {}", self.current());
         self.move_token();
+
+        // function logic
         if self.current() == &Token::Symbol(Symbol::OpenBrace) {
-            println!("Before Stat Sequence for Func: {}", self.current());
             self.stat_sequence();
             if self.current() != &Token::Symbol(Symbol::CloseBrace) {
                 panic!("Error: FuncBody missing Closed Brace: \"}}\"");
             }
         }
         self.move_token();
-        println!("End of Func Body: {}", self.current());
     }
+
+    /// computation
+    ///
+    /// "main" [varDecl] {funcDecl} "{" statSequence "}" "."
+    ///
     fn computation(&mut self) {
-        // "main" [varDecl] {funcDecl} "{" statSequence "}" "."
-        println!("Current Token at the beginning: {}", self.current());
+        // Main
         if self.current() != &Token::Main {
             panic!("Error: Missing Main keyword");
         }
         self.move_token();
+
+        // Global Variables
         if self.current() == &Token::Var {
             self.var_decl();
             self.move_token();
         }
-        println!("Before Checking Function: {}", self.current());
+
+        // User-defined functions
         while self.current() == &Token::Void || self.current() == &Token::Function {
-            println!("Going to Func Decl");
             self.func_decl();
             self.move_token();
         }
-        println!("After Function: {}", self.current());
+
+        // initial block for main function
         self.total_block += 1;
         let main_key = self.total_block;
         let main_block = RefCell::new(Block::new(main_key, "block".to_string(), HashMap::new()));
@@ -908,13 +992,17 @@ impl Parser {
             );
         }
         self.add_inst_to_tail(Operator::End);
-        // self.blocks.push(block);
         self.connect(0, main_key);
     }
 
     /// helper functions to add instruction to the current block
     ///
+
+    /// add_const_to_bb0
     ///
+    /// op: Operator
+    ///
+    /// add constant variable to the current block 0
     fn add_const_to_bb0(&mut self, op: Operator) -> i32 {
         self.total_inst += 1;
         let inst_num = self.total_inst * (-1);
@@ -929,6 +1017,11 @@ impl Parser {
         inst_num
     }
 
+    /// add_inst_to_tail
+    ///
+    /// op: Operator
+    ///
+    /// add new instruction to the current block (Tail)
     fn add_inst_to_tail(&mut self, op: Operator) -> i32 {
         self.total_inst += 1;
         let new_inst = Inst::new(self.total_inst, op);
@@ -941,6 +1034,11 @@ impl Parser {
         self.total_inst
     }
 
+    /// add_inst_to_head
+    ///
+    /// op: Operator
+    ///
+    /// add new instruction to the current block (Head)
     fn add_inst_to_head(&mut self, op: Operator) -> i32 {
         self.total_inst += 1;
         let new_inst = Inst::new(self.total_inst, op);
@@ -953,28 +1051,54 @@ impl Parser {
         self.total_inst
     }
 
-    fn set_up_table(&mut self) {}
-
+    /// swith_block
+    ///
+    /// key: usize
+    ///
+    /// switch the current block key
     fn switch_block(&mut self, key: usize) {
         self.cur_block_num = key;
     }
 
+    /// switch_block0
+    ///
+    /// key: usize
+    ///
+    /// switch the current block 0 key
     fn switch_block0(&mut self, key: usize) {
         self.block0_num = key;
     }
 
+    /// show_vars
+    ///
+    /// print vars (variable containers)
     fn show_vars(&self) {
         println!("Vars: {:?}", self.vars);
     }
 
+    /// show_insts
+    ///
+    /// print insts (instruction containers for function
+    ///
+    /// Used to see all the instructions in the main function at the end
     fn show_insts(&self) {
         println!("Insts: {:?}", self.insts);
     }
 
+    /// show_inst_storage
+    ///
+    /// show instruction storage for function
+    ///
+    /// Used to see the information of instruction storage of the main function at the end
     fn show_inst_storage(&self) {
         println!("Inst Storage: {:?}", self.inst_storage);
     }
 
+    /// show_blocks
+    ///
+    /// show blocks
+    ///
+    /// Used to see all the blocks at the end (main + user-defined functions)
     fn show_blocks(&self) {
         // println!("Block0: ");
         println!("Block#: {}", self.blocks.len());
@@ -984,9 +1108,15 @@ impl Parser {
                 println!("{:?}", b.borrow());
             }
         }
-        // println!("{:?}", self.block0.borrow());
     }
 
+    /// update_table
+    ///
+    /// var: String
+    ///
+    /// inst_num: i32
+    ///
+    /// update table information of the current block
     fn update_table(&mut self, var: String, inst_num: i32) {
         if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b.borrow_mut().update_table(var.clone(), inst_num);
@@ -994,6 +1124,13 @@ impl Parser {
         }
     }
 
+    /// connect
+    ///
+    /// front_num: usize
+    ///
+    /// back_num: usize
+    ///
+    /// connect blocks (front -> back)
     fn connect(&mut self, front_num: usize, back_num: usize) {
         let front_block = if let Some(front) = self.blocks.get(&front_num) {
             front
@@ -1004,10 +1141,15 @@ impl Parser {
             )
         };
         front_block.borrow_mut().add_next(back_num as usize);
-        // back.borrow_mut()
-        //     .add_prev(front.borrow().get_block_num() as usize);
     }
 
+    /// set_dom
+    ///
+    /// x_num: usize
+    ///
+    /// y_num: usize
+    ///
+    /// set dominator x dom y
     fn set_dom(&mut self, x_num: usize, y_num: usize) {
         let x_block = if let Some(x) = self.blocks.get(&x_num) {
             x
@@ -1017,6 +1159,15 @@ impl Parser {
         x_block.borrow_mut().add_dom(y_num as usize);
     }
 
+    /// generate_phi
+    ///
+    /// pre_key: usize
+    ///
+    /// now_key: usize
+    ///
+    /// generate phi functions comparing two blocks (pre & now)
+    ///
+    /// return the information containing variable, previous instruction and current instruction number
     fn generate_phi(&mut self, pre_key: usize, now_key: usize) -> Vec<(String, (i32, i32))> {
         if let (Some(pre), Some(now)) = (self.blocks.get(&pre_key), self.blocks.get(&now_key)) {
             let vars = pre.borrow().compare_table(now);
@@ -1030,35 +1181,54 @@ impl Parser {
         vec![]
     }
 
+    /// update_by_phi
+    ///
+    /// phis: HashMap<i32, i32>
+    ///
+    /// start_key: usize
+    ///
+    /// update instructions based on phi function info
     fn update_by_phi(&mut self, phis: HashMap<i32, i32>, start_key: usize) {
-        println!("Update By Phi");
-        println!(
-            "start key: {}\ntotal_block: {}",
-            start_key, self.total_block
-        );
         for i in start_key..self.total_block + 1 {
-            println!("Current i: {}", i);
             if let Some(block) = self.blocks.get(&i) {
                 block.borrow_mut().update_inst(&phis);
             }
         }
     }
 
+    /// update_rel_op
+    ///
+    /// cond_key: usize
+    ///
+    /// loc_rhs: (i32, String)
+    ///
+    /// update rel_op instruction
     fn update_rel_op(&mut self, cond_key: usize, loc_rhs: (i32, String)) {
         if let Some(bb) = self.blocks.get(&cond_key) {
             bb.borrow_mut().fill_in_none(loc_rhs);
         }
     }
 
+    /// update_table_with_insts
+    ///
+    /// var_to_phi: HashMap<String, i32>
+    ///
+    /// start_key: usize
+    ///
+    /// update table based on the phi function info
     fn update_table_with_insts(&mut self, var_to_phi: HashMap<String, i32>, start_key: usize) {
         for i in start_key..self.total_block + 1 {
-            println!("Current i: {}", i);
             if let Some(block) = self.blocks.get(&i) {
                 block.borrow_mut().update_table_with_insts(&var_to_phi);
             }
         }
     }
 
+    /// get_table_from_block
+    ///
+    /// key: usize
+    ///
+    /// return the table of the block
     fn get_table_from_block(&self, key: usize) -> HashMap<String, Option<i32>> {
         if let Some(block) = self.blocks.get(&key) {
             return block.borrow().get_table();
@@ -1066,19 +1236,19 @@ impl Parser {
         HashMap::new()
     }
 
-    fn is_empty_inst(&self) -> bool {
-        if let Some(block) = self.blocks.get(&self.cur_block_num) {
-            return block.borrow().get_inst_num() == 0;
-        }
-        return true;
-    }
-
+    /// get_current_name
+    ///
+    /// return current block's name
     fn get_current_name(&self) -> Option<String> {
         if let Some(block) = self.blocks.get(&self.cur_block_num) {
             return Some(block.borrow().get_func_name());
         }
         None
     }
+
+    /// get_current_block_name
+    ///
+    /// return current block's block name (name + number)
     fn get_current_block_name(&self) -> Option<String> {
         if let Some(block) = self.blocks.get(&self.cur_block_num) {
             return Some(block.borrow().get_block_name());
@@ -1086,23 +1256,11 @@ impl Parser {
         None
     }
 
-    fn get_current_head(&self) -> Option<i32> {
-        if let Some(block) = self.blocks.get(&self.cur_block_num) {
-            if let Some(h) = block.borrow().get_head_num() {
-                return Some(h);
-            }
-        }
-        None
-    }
-    fn get_head(&self, key: usize) -> Option<i32> {
-        if let Some(block) = self.blocks.get(&key) {
-            if let Some(h) = block.borrow().get_head_num() {
-                return Some(h);
-            }
-        }
-        None
-    }
-
+    /// is_void
+    ///
+    /// key: usize
+    ///
+    /// check if the block (function) type is void or non-void
     fn is_void(&self, key: usize) -> bool {
         if let Some(block) = self.blocks.get(&key) {
             if matches!(block.borrow().get_tail_op(), Operator::Ret(_)) {
@@ -1112,6 +1270,11 @@ impl Parser {
         true
     }
 
+    /// get_bb0
+    ///
+    /// op: &Operator
+    ///
+    /// return the operator's instruction number in block 0
     fn get_bb0(&self, op: &Operator) -> Option<i32> {
         if let Some(bb0) = self.blocks.get(&self.block0_num) {
             return bb0.borrow().get_inst(op);
@@ -1119,6 +1282,9 @@ impl Parser {
         None
     }
 
+    /// visualize_ir
+    ///
+    /// visualize IR for a graph visualizer
     fn visualize_ir(&self) {
         println!("digraph G {{");
         for i in 0..self.total_block + 1 {
@@ -1177,60 +1343,9 @@ impl Parser {
         }
         println!("}}");
     }
-    // pub fn arithm(&mut self, op: Operator, x: &mut Result, y: &mut Result) {
-    //     let mut z = Result::new(Kind::Const, 0, 0, 0);
-    //     if x.get_kind() == Kind::Const && y.get_kind() == Kind::Const {
-    //         let x_value = x.get_value();
-    //         let y_value = y.get_value();
-    //         match op {
-    //             Operator::Add(_, _) => z.set_value(x_value + y_value),
-    //             Operator::Mul(_, _) => z.set_value(x_value * y_value),
-    //             Operator::Sub(_, _) => z.set_value(x_value - y_value),
-    //             Operator::Div(_, _) => z.set_value(x_value / y_value),
-    //             _ => (),
-    //         }
-    //     } else {
-    //         self.load(x);
-    //         if y.get_kind() == Kind::Const {
-    //             z.set_regn(self.allocateReg());
-    //             // PUT immop[op], z.regn, x.regn, y.value
-    //             self.deallocate(x.get_regn());
-    //             z.set_kind(Kind::Reg);
-    //         } else {
-    //             self.load(y);
-    //             z.set_regn(self.allocateReg());
-    //             self.deallocate(x.get_regn());
-    //             self.deallocate(y.get_regn());
-    //         }
-    //     }
-    // }
-
-    // fn allocateReg(&mut self) -> i32 {
-    //     for i in 1..32 {
-    //         if self.busy[i] == 0 {
-    //             return i as i32;
-    //         }
-    //     }
-    //     return -1;
-    // }
-
-    // fn deallocate(&mut self, i: i32) {
-    //     self.busy[i as usize] = 0;
-    // }
-
-    // pub fn load(&mut self, x: &mut Result) {
-    //     if x.get_kind() == Kind::Const {
-    //         x.set_regn(self.allocateReg());
-    //         x.set_kind(Kind::Reg);
-    //         // Put occurs: ADDI x.regn, 0, x.value
-    //     } else if x.get_kind() == Kind::Var {
-    //         x.set_regn(self.allocateReg());
-    //         // Put occurs: LOAD x.regn, base_reg, x.address
-    //         x.set_kind(Kind::Reg);
-    //     }
-    // }
 }
 
+/// Tests:
 #[cfg(test)]
 mod tests {
     use super::*;
