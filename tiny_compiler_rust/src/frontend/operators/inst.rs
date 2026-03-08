@@ -68,7 +68,17 @@ impl<'a> Inst {
         false
     }
 
-    pub fn get_op_data(self) -> (Option<i32>, Option<i32>) {
+    pub fn get_op_one(self) -> Option<i32> {
+        match self.op {
+            Operator::SetPar1(a)
+            | Operator::SetPar2(a)
+            | Operator::SetPar3(a)
+            | Operator::Ret(a) => Some(a),
+            _ => None,
+        }
+    }
+
+    pub fn get_op_two(self) -> (Option<i32>, Option<i32>) {
         match self.op {
             Operator::Add(a, b)
             | Operator::Sub(a, b)
@@ -92,7 +102,20 @@ impl<'a> Inst {
         }
     }
 
-    pub fn update_op_insts(&mut self, updated_a: i32, updated_b: i32) {
+    pub fn update_op_one(&mut self, updated_a: i32) {
+        let updated_op = match self.op {
+            Operator::SetPar1(_) => Some(Operator::SetPar1(updated_a)),
+            Operator::SetPar2(_) => Some(Operator::SetPar2(updated_a)),
+            Operator::SetPar3(_) => Some(Operator::SetPar3(updated_a)),
+            Operator::Ret(_) => Some(Operator::Ret(updated_a)),
+            _ => None,
+        };
+        if let Some(op) = updated_op {
+            self.op = op;
+        }
+    }
+
+    pub fn update_op_two(&mut self, updated_a: i32, updated_b: i32) {
         let updated_op = match self.op {
             Operator::Add(_, _) => Some(Operator::Add(updated_a, updated_b)),
             Operator::Sub(_, _) => Some(Operator::Sub(updated_a, updated_b)),

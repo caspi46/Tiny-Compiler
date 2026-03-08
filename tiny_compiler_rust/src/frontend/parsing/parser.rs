@@ -1234,6 +1234,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn copy_propa_test() {
+        let input = String::from(
+            "main
+        var a, b, c, d; {
+            let a <- 1 + 1;
+            let b <- a; 
+            let c <- a + 1; 
+            let d <- b + 1;
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
     fn calc_test1() {
         let input = String::from(
             "main
@@ -1522,6 +1541,31 @@ fi
     }
 
     #[test]
+    fn while_if_test() {
+        let input = String::from(
+            "main
+        var a; {
+        let a <- 1;
+        while 1 == 2 do
+            if 1 == a then
+                let a <- a - 1;
+            else 
+                while 1 == a do 
+                    let a <- a + 1;
+                od;
+            fi;
+        od;
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
     fn phi_func_test() {
         let input = String::from(
             "main
@@ -1675,6 +1719,66 @@ fi
     let b <- 2; 
     let e <- 3;
     call OutputNum(call sum(a, b));
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn while_func_call_test() {
+        let input = String::from(
+            "main
+    var a, b, e;
+
+    function sum(a, b, d); var c; {
+        let c <- a + d;
+        let a <- a + d; 
+        return c;
+    };
+
+    {
+    let a <- 1;
+    let b <- 2; 
+    let e <- 3;
+    while a > b do 
+        let a <- call sum(a, b, e);
+    od;
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn if_func_call_test() {
+        let input = String::from(
+            "main
+    var a, b, e;
+
+    function sum(a, b, d); var c; {
+        let c <- a + d;
+        let a <- a + d; 
+        return c;
+    };
+
+    {
+    let a <- 1;
+    let b <- 2; 
+    let e <- 3;
+    if a > b then
+        let a <- call sum(a, b, e);
+    fi;
     }
     .",
         );

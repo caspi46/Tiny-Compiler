@@ -217,7 +217,7 @@ impl<'a> Block {
         for i in 0..self.insts.len() {
             println!("Current i for update Inst: {}", i);
             let mut inst = self.insts[i].clone();
-            if let (Some(a), Some(b)) = &inst.clone().get_op_data() {
+            if let (Some(a), Some(b)) = &inst.clone().get_op_two() {
                 let new_a = match ori_to_new.get(&a) {
                     Some(new_a) => *new_a,
                     _ => *a,
@@ -226,8 +226,15 @@ impl<'a> Block {
                     Some(new_b) => *new_b,
                     _ => *b,
                 };
-                inst.update_op_insts(new_a, new_b);
+                inst.update_op_two(new_a, new_b);
+            } else if let Some(a) = &inst.clone().get_op_one() {
+                let new_a = match ori_to_new.get(&a) {
+                    Some(new_a) => *new_a,
+                    _ => *a,
+                };
+                inst.update_op_one(new_a);
             }
+
             self.insts[i] = inst;
         }
     }
