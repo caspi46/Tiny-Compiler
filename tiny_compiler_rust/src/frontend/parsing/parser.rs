@@ -430,6 +430,7 @@ impl Parser {
 
         // fi block
         self.total_block += 1;
+        let fi_block_name = "fi_".to_string() + &self.total_block.to_string();
         let fi_block = RefCell::new(Block::new(
             self.total_block,
             "fi".to_string(),
@@ -486,7 +487,6 @@ impl Parser {
             // self.add_inst_to_tail(Operator::Bra(jump_inst));
             println!("Current Total Inst before phi: {}", self.total_inst);
             // Update condition instruction
-
             if self.cur_block_num != else_key {
                 self.connect(self.cur_block_num, fi_key);
                 phis = self.generate_phi(self.cur_block_num, else_key);
@@ -494,10 +494,11 @@ impl Parser {
                 self.connect(else_key, fi_key);
                 phis = self.generate_phi(then_key, else_key);
             }
+            self.add_inst_to_tail(Operator::Bra(fi_block_name));
             self.switch_block(else_key);
             let mut loc_rhs = (cond, "".to_string());
-            if let Some(else_head) = self.get_current_block_name() {
-                loc_rhs.1 = else_head;
+            if let Some(else_name) = self.get_current_block_name() {
+                loc_rhs.1 = else_name;
             }
             self.update_rel_op(if_key, loc_rhs);
         } else {
@@ -613,7 +614,6 @@ impl Parser {
         self.set_dom(while_key, od_key);
 
         self.switch_block(od_key);
-        self.add_inst_to_head(Operator::EMPTY);
         if let Some(block_name) = self.get_current_block_name() {
             self.update_rel_op(while_key, (cond, block_name));
         }
@@ -624,8 +624,9 @@ impl Parser {
         println!("In Return: {}", self.current());
         let return_var = self.expression();
         let return_op = Operator::Ret(return_var);
-        let return_inst = self.add_inst_to_tail(return_op);
+        self.add_inst_to_tail(return_op);
     }
+
     fn statement(&mut self) {
         // statement {";" statement } [";"]
         // placeholder for now
@@ -906,6 +907,7 @@ impl Parser {
                 self.current()
             );
         }
+        self.add_inst_to_tail(Operator::End);
         // self.blocks.push(block);
         self.connect(0, main_key);
     }
@@ -1555,6 +1557,7 @@ fi
                 od;
             fi;
         od;
+        let a <- a + 1;
     }.",
         );
         let mut parse = Parser::new(input);

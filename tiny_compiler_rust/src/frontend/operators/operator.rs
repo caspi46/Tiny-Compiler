@@ -16,7 +16,7 @@ pub enum Operator {
     // End
     End,
     // RelOp
-    Bra(i32),
+    Bra(String),
     Bne(i32, Option<String>),
     Ble(i32, Option<String>),
     Bge(i32, Option<String>),
@@ -38,7 +38,6 @@ pub enum Operator {
     SetPar1(i32),
     SetPar2(i32),
     SetPar3(i32),
-    EMPTY, // For branch connection
 }
 
 impl fmt::Display for Operator {
@@ -80,7 +79,6 @@ impl fmt::Display for Operator {
             Operator::SetPar2(x) => write!(f, "setPar2 ({})", x),
             Operator::SetPar3(x) => write!(f, "setPar3 ({})", x),
 
-            Operator::EMPTY => write!(f, "empty"),
             _ => write!(f, "Error detected for None"),
         }
     }

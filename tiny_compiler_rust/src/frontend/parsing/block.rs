@@ -217,6 +217,7 @@ impl<'a> Block {
         for i in 0..self.insts.len() {
             println!("Current i for update Inst: {}", i);
             let mut inst = self.insts[i].clone();
+            // case 1 to check two
             if let (Some(a), Some(b)) = &inst.clone().get_op_two() {
                 let new_a = match ori_to_new.get(&a) {
                     Some(new_a) => *new_a,
