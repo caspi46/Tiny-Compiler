@@ -285,8 +285,8 @@ impl Parser {
                     println!("Inst Num for no optimization sub: {}", sub);
                     sub
                 };
-                x = return_val;
             }
+            x = return_val;
         }
         return_val
     }
@@ -1330,7 +1330,7 @@ mod tests {
     }
 
     #[test]
-    fn calc_test1() {
+    fn opt_arge_sim_cse_test() {
         let input = String::from(
             "main
         var a, b, c; {
@@ -1350,7 +1350,7 @@ mod tests {
     }
 
     #[test]
-    fn calc_test2() {
+    fn calc_test1() {
         let input = String::from(
             "main
         var a; {
@@ -1366,7 +1366,7 @@ mod tests {
     }
 
     #[test]
-    fn calc_test3() {
+    fn calc_test2() {
         let input = String::from(
             "main
         var a; {
@@ -1382,7 +1382,7 @@ mod tests {
     }
 
     #[test]
-    fn calc_test4() {
+    fn calc_test3() {
         let input = String::from(
             "main
         var a, b; {
@@ -1398,6 +1398,26 @@ mod tests {
         parse.show_blocks();
         parse.visualize_ir();
     }
+
+    #[test]
+    fn calc_test4() {
+        let input = String::from(
+            "main
+        var a, b; {
+            let a <- 1 * 2 * 3 * 4; 
+            let b <- 1 - 2 - 3 - 4; 
+            let a <- 1 + 2 + 3 + 4; 
+            let b <- 1 / 2 / 3 / 4; 
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
     #[test]
     fn func_call_test() {
         let input = String::from(
