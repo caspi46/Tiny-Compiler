@@ -1385,10 +1385,11 @@ mod tests {
     fn calc_test3() {
         let input = String::from(
             "main
-        var a, b; {
+        var a, b, c; {
             let a <- 1 / (3 * 1) * 3;
             let b <- 2 / (3 * 1) * 3 - 1;
-            let b <- call InputNum() + call InputNum();
+            let c <- call InputNum(); 
+            let b <- c + call InputNum() + 2;
     }.",
         );
         let mut parse = Parser::new(input);
