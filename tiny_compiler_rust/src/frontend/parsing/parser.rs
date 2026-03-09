@@ -468,25 +468,12 @@ impl Parser {
         let if_key = self.cur_block_num;
 
         // then block
-        self.total_block += 1;
-        let then_block = RefCell::new(Block::new(
-            self.total_block,
-            "then".to_string(),
-            before_table.clone(),
-        ));
-        self.blocks.insert(self.total_block, then_block);
-        let then_key = self.total_block;
+        let then_key = self.create_new_block("then".to_string(), before_table.clone());
+        self.set_dom(if_key, then_key);
 
         // fi block
-        self.total_block += 1;
-        let fi_block_name = "fi_".to_string() + &self.total_block.to_string();
-        let fi_block = RefCell::new(Block::new(
-            self.total_block,
-            "fi".to_string(),
-            before_table.clone(),
-        ));
-        self.blocks.insert(self.total_block, fi_block);
-        let fi_key = self.total_block;
+        let fi_key = self.create_new_block("fi".to_string(), before_table.clone());
+        let fi_block_name = "fi_".to_string() + &fi_key.to_string();
         self.set_dom(if_key, fi_key);
 
         // conditional statement
@@ -500,7 +487,6 @@ impl Parser {
         self.switch_block(then_key);
         self.stat_sequence();
         self.connect(if_key, then_key);
-        self.set_dom(if_key, then_key);
 
         // generate phis for then
         let mut phis;
@@ -515,15 +501,7 @@ impl Parser {
         // else block check
         if self.current() == &Token::Else {
             // since else is optional
-            self.total_block += 1;
-            println!("Current Table at Else : {:?}", before_table.clone());
-            let else_block = RefCell::new(Block::new(
-                self.total_block,
-                "else".to_string(),
-                before_table,
-            ));
-            self.blocks.insert(self.total_block, else_block);
-            let else_key = self.total_block;
+            let else_key = self.create_new_block("else".to_string(), before_table);
             self.connect(if_key, else_key);
             self.set_dom(if_key, else_key);
             self.switch_block(else_key);
@@ -579,24 +557,10 @@ impl Parser {
         let before_table = self.vars.clone();
 
         // while block
-        self.total_block += 1;
-        let while_key = self.total_block;
-        let while_block = RefCell::new(Block::new(
-            self.total_block,
-            "while".to_string(),
-            before_table.clone(),
-        ));
-        self.blocks.insert(self.total_block, while_block);
+        let while_key = self.create_new_block("while".to_string(), before_table.clone());
 
         // do block
-        self.total_block += 1;
-        let do_key = self.total_block;
-        let do_block = RefCell::new(Block::new(
-            self.total_block,
-            "do".to_string(),
-            before_table.clone(),
-        ));
-        self.blocks.insert(self.total_block, do_block);
+        let do_key = self.create_new_block("do".to_string(), before_table.clone());
 
         // Edges
         self.connect(self.cur_block_num, while_key);
@@ -657,15 +621,8 @@ impl Parser {
         }
 
         // od block
-        self.total_block += 1;
-        let od_key = self.total_block;
-        let od_block = RefCell::new(Block::new(
-            self.total_block,
-            "od".to_string(),
-            self.get_table_from_block(while_key),
-        ));
+        let od_key = self.create_new_block("od".to_string(), self.get_table_from_block(while_key));
 
-        self.blocks.insert(self.total_block, od_block);
         self.connect(while_key, od_key);
         self.set_dom(while_key, od_key);
 
@@ -793,21 +750,11 @@ impl Parser {
         }
 
         // block0 for the user-defined function
-        self.total_block += 1;
-        let func_block0_key = self.total_block;
-        let func_block0 = RefCell::new(Block::new(
-            self.total_block,
-            "func_block0".to_string(),
-            HashMap::new(),
-        ));
-        self.blocks.insert(func_block0_key, func_block0);
+        let func_block0_key = self.create_new_block(func_name.clone() + &"0", HashMap::new());
         self.switch_block0(func_block0_key);
 
         // initial block for user-defined function
-        self.total_block += 1;
-        let func_key = self.total_block;
-        let func_block = RefCell::new(Block::new(self.total_block, func_name, HashMap::new()));
-        self.blocks.insert(func_key, func_block);
+        let func_key: usize = self.create_new_block(func_name, HashMap::new());
         self.switch_block(func_key);
 
         self.connect(func_block0_key, func_key);
@@ -966,11 +913,8 @@ impl Parser {
         }
 
         // initial block for main function
-        self.total_block += 1;
-        let main_key = self.total_block;
-        let main_block = RefCell::new(Block::new(main_key, "block".to_string(), HashMap::new()));
+        let main_key = self.create_new_block("main".to_string(), HashMap::new());
         self.switch_block(self.total_block);
-        self.blocks.insert(self.total_block, main_block);
 
         if self.current() != &Token::Symbol(Symbol::OpenBrace) {
             panic!("Error: Missing Opened Brace for Main");
@@ -997,6 +941,22 @@ impl Parser {
 
     /// helper functions to add instruction to the current block
     ///
+    ///
+
+    /// create_new_block
+    ///
+    /// name: String
+    ///
+    /// table: HashMap<String, Option<i32>>
+    ///
+    /// create new block and return its key
+    fn create_new_block(&mut self, name: String, table: HashMap<String, Option<i32>>) -> usize {
+        self.total_block += 1;
+        let block_key = self.total_block;
+        let block = RefCell::new(Block::new(self.total_block, name, table));
+        self.blocks.insert(block_key, block);
+        block_key
+    }
 
     /// add_const_to_bb0
     ///
@@ -1610,6 +1570,7 @@ fi
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
     #[test]
     fn if_while_test() {
@@ -1754,7 +1715,7 @@ fi
     var a, b;
 
     function sum(a, b); var c; {
-        let c <- a;
+        let c <- a - 1;
         return c;
     };
 
