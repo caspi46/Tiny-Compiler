@@ -194,6 +194,16 @@ impl Tokenizer {
         ch == ' ' || ch == '\n'
     }
 
+    fn is_negative(&self, ch: char, token: &str) -> bool {
+        if ch != '-' {
+            return false;
+        }
+        match token {
+            "" => true,
+            _ => false,
+        }
+    }
+
     fn check_token(&mut self, token: &str) -> bool {
         self.is_op(token)
             || self.is_rel_op(token)
@@ -216,6 +226,11 @@ impl Tokenizer {
             println!("current token: {}", cur_token);
             println!("current input element: {}", self.input[i]);
             let mut next = "".to_string();
+            // if self.is_negative(self.input[i], cur_str) {
+            //     next = self.input[i].to_string();
+            //     self.is_number(cur_str);
+            //     println!("Current Token:{}\nNext in is_neg:{}\n", cur_str, next);
+            // }
             // check the symbol
             if !self.is_ch_symbol(self.input[i]) && self.is_symbol(cur_str) {
                 next = self.input[i].to_string();
@@ -265,34 +280,42 @@ impl Tokenizer {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     #[test]
-//     fn test1() {
-//         let input = String::from(
-//             "main
-//         var a, b, c, d, e; {
-//             let a <- call InputNum();
-//             let b <- a;
-//             let c <- b;
-//             let d <- b + c;
-//             let e <- a + b;
-//             if a < 0 then let d <- d + e; let a <- d else let d <- e fi;
-//             call OutputNum(a)
-//     }.",
-//         );
-//         let mut tokenizer = Tokenizer::new(input);
-//         tokenizer.generate_token();
-//         tokenizer.get_tokens();
-//     }
+    #[test]
+    fn test1() {
+        let input = String::from(
+            "main
+        var a, b, c, d, e; {
+            let a <- call InputNum();
+            let b <- a;
+            let c <- b;
+            let d <- b + c;
+            let e <- a + b;
+            if a < 0 then let d <- d + e; let a <- d else let d <- e fi;
+            call OutputNum(a)
+    }.",
+        );
+        let mut tokenizer = Tokenizer::new(input);
+        tokenizer.generate_token();
+        tokenizer.get_tokens();
+    }
 
-//     #[test]
-//     fn test2() {
-//         let input = String::from("a<-b 1234");
-//         let mut tokenizer = Tokenizer::new(input);
-//         tokenizer.generate_token();
-//         tokenizer.get_tokens();
-//     }
-// }
+    #[test]
+    fn test2() {
+        let input = String::from("a<-b 1234");
+        let mut tokenizer = Tokenizer::new(input);
+        tokenizer.generate_token();
+        tokenizer.get_tokens();
+    }
+
+    #[test]
+    fn negative_check() {
+        let input = String::from("1-1");
+        let mut tokenizer = Tokenizer::new(input);
+        tokenizer.generate_token();
+        tokenizer.get_tokens();
+    }
+}

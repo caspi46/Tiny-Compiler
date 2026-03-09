@@ -265,6 +265,7 @@ impl Parser {
             };
             let expected_num = self.total_inst + 1;
             if let Some(add) = self.inst_storage.add_adds(op.clone(), expected_num) {
+                println!("Add return Val: {}", add);
                 return_val = if add == expected_num {
                     let inst_num = self.add_inst_to_tail(op.clone());
                     self.insts.insert(op.clone(), inst_num);
@@ -1311,12 +1312,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn copy_propa_test() {
+    fn copy_propa_test1() {
+        let input = String::from(
+            "main
+        var a, b, c, d; {
+            let a <- 1;
+            let b <- a;
+            let c <- a + 1; 
+            let d <- b + 1;
+            let c <- 1 + 1;
+            let a <- 2;
+            let d <- a + 1;
+    }.",
+        );
+        // 1 + 1 = a + 1 = b + 1 before a <- 2;
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn copy_propa_test2() {
         let input = String::from(
             "main
         var a, b, c, d; {
             let a <- 1 + 1;
-            let b <- a; 
+            let b <- a;
             let c <- a + 1; 
             let d <- b + 1;
     }.",
@@ -1335,10 +1359,34 @@ mod tests {
             "main
         var a, b, c; {
             let b <- a + 1;
-            let b <- 1 + a;
+            let b <- 1 +a;
             let b <- a * 2; 
             let a <- 2;
-            let b <- 2 * a;
+            let b <- 2 *a;
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn copy_propa_test3() {
+        let input = String::from(
+            "main
+        var a, b, c; {
+            let a <- 1; 
+            let b <- 1; 
+            let c <- a + b;
+            if a == b then 
+                let c <- 1 + 1;
+                let b <- 3; 
+                let c <- b - 1;
+            fi;
+            let b <- a + 1; 
     }.",
         );
         let mut parse = Parser::new(input);

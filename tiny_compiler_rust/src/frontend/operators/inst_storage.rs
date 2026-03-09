@@ -35,23 +35,40 @@ impl InstStorage {
             return None;
         }
         match new_add {
-            Operator::Add(x, y) => match self.adds.get(&Operator::Add(y, x)) {
-                Some(&i) => {
-                    return Some(i);
-                }
-                _ => (),
-            },
+            // since x + y = y + x
+            Operator::Add(x, y) => {
+                match self.adds.get(&Operator::Add(y, x)) {
+                    Some(&i) => {
+                        return Some(i);
+                    }
+                    _ => (),
+                };
+                match self.adds.get(&Operator::Add((-1) * x, y)) {
+                    Some(&i) => {
+                        return Some(i);
+                    }
+                    _ => (),
+                };
+                match self.adds.get(&Operator::Add((-1) * x, (-1) * y)) {
+                    Some(&i) => {
+                        return Some(i);
+                    }
+                    _ => (),
+                };
+                match self.adds.get(&Operator::Add(x, (-1) * y)) {
+                    Some(&i) => {
+                        return Some(i);
+                    }
+                    _ => (),
+                };
+            }
             _ => panic!("Error: Failed to check add operator in storage"),
         };
         if !self.adds.contains_key(&new_add) {
             self.adds.insert(new_add, inst_num);
             return Some(inst_num);
         }
-
-        match self.adds.get(&new_add) {
-            Some(&i) => Some(i),
-            _ => panic!("Error: Failed to add new add operator in storage"),
-        }
+        None
     }
 
     pub fn add_subs(&mut self, new_sub: Operator, inst_num: i32) -> Option<i32> {
