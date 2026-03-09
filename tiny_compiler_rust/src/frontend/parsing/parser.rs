@@ -1334,11 +1334,11 @@ mod tests {
         let input = String::from(
             "main
         var a, b, c; {
-            let a <- 1;
-            let b <- 2; 
-            let a <- a + 1;
-            let c <- b + a - 2;
-            let a <- c / 2;
+            let b <- a + 1;
+            let b <- 1 + a;
+            let b <- a * 2; 
+            let a <- 2;
+            let b <- 2 * a;
     }.",
         );
         let mut parse = Parser::new(input);

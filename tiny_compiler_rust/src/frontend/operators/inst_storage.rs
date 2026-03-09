@@ -34,10 +34,20 @@ impl InstStorage {
         if !matches!(new_add, Operator::Add(_, _)) {
             return None;
         }
+        match new_add {
+            Operator::Add(x, y) => match self.adds.get(&Operator::Add(y, x)) {
+                Some(&i) => {
+                    return Some(i);
+                }
+                _ => (),
+            },
+            _ => panic!("Error: Failed to check add operator in storage"),
+        };
         if !self.adds.contains_key(&new_add) {
             self.adds.insert(new_add, inst_num);
             return Some(inst_num);
         }
+
         match self.adds.get(&new_add) {
             Some(&i) => Some(i),
             _ => panic!("Error: Failed to add new add operator in storage"),
@@ -76,6 +86,15 @@ impl InstStorage {
         if !matches!(new_mul, Operator::Mul(_, _)) {
             return None;
         }
+        match new_mul {
+            Operator::Mul(x, y) => match self.muls.get(&Operator::Mul(y, x)) {
+                Some(&i) => {
+                    return Some(i);
+                }
+                _ => (),
+            },
+            _ => panic!("Error: Failed to check add operator in storage"),
+        };
         if !self.muls.contains_key(&new_mul) {
             self.muls.insert(new_mul, inst_num);
             return Some(inst_num);
