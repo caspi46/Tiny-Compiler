@@ -175,10 +175,20 @@ impl<'a> Block {
     pub fn compare_table(&self, other: &RefCell<Block>) -> HashMap<String, (i32, i32)> {
         let mut updated_vars = HashMap::new();
         for (var, inst_n) in self.table.clone() {
-            if let (Some(i), Some(inst_n)) = (other.borrow().check_table(&var), inst_n) {
-                if inst_n != i {
-                    updated_vars.insert(var, (inst_n, i));
+            match (other.borrow().check_table(&var), inst_n) {
+                (Some(now_i), Some(other_i)) => {
+                    println!(
+                        "Variable: {}, my inst: {}, other inst: {}",
+                        var, now_i, other_i
+                    );
+                    if now_i != other_i {
+                        updated_vars.insert(var, (now_i, other_i));
+                    }
                 }
+                (Some(i), None) => {
+                    updated_vars.insert(var, (i, 0));
+                }
+                _ => (),
             }
         }
         updated_vars
@@ -213,21 +223,23 @@ impl<'a> Block {
 
     pub fn update_inst(&mut self, ori_to_new: &HashMap<i32, i32>) {
         println!("Current Table for update Inst: {}", self.block_name);
-        // println!("Current ori_to_new: {:?}", ori_to_new);
+        println!("Current ori_to_new: {:?}", ori_to_new);
         for i in 0..self.insts.len() {
             println!("Current i for update Inst: {}", i);
             let mut inst = self.insts[i].clone();
             // case 1 to check two
             if let (Some(a), Some(b)) = &inst.clone().get_op_two() {
-                let new_a = match ori_to_new.get(&a) {
+                let a_key: i32 = match ori_to_new.get(&a) {
                     Some(new_a) => *new_a,
                     _ => *a,
                 };
-                let new_b = match ori_to_new.get(&b) {
+                println!("a_key: {}", a_key);
+                let b_key = match ori_to_new.get(&b) {
                     Some(new_b) => *new_b,
                     _ => *b,
                 };
-                inst.update_op_two(new_a, new_b);
+                inst.update_op_two(a_key, b_key);
+                println!("Update by Phi: {}", inst.clone().get_operator());
             } else if let Some(a) = &inst.clone().get_op_one() {
                 let new_a = match ori_to_new.get(&a) {
                     Some(new_a) => *new_a,

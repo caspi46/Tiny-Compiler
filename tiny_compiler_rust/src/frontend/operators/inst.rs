@@ -123,7 +123,9 @@ impl<'a> Inst {
             _ => None,
         };
         if let Some(op) = updated_op {
+            println!("OP: {} & Original Op: {}", op, self.op);
             self.op = op;
+            println!("UPDATE_OP_TWO: {}", self.op);
         }
     }
 

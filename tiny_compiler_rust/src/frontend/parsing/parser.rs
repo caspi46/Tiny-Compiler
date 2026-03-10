@@ -469,7 +469,7 @@ impl Parser {
     ///
     /// "if" relation "then" statSequence ["else" statSequence] "fi"
     fn if_statement(&mut self) {
-        let before_table = self.vars.clone();
+        let before_table = self.get_current_table();
         let if_key = self.cur_block_num;
 
         // then block
@@ -495,31 +495,29 @@ impl Parser {
 
         // generate phis for then
         let mut phis;
-        if self.cur_block_num != then_key {
-            self.connect(self.cur_block_num, fi_key);
-            phis = self.generate_phi(self.cur_block_num, then_key);
-        } else {
-            self.connect(then_key, fi_key);
-            phis = self.generate_phi(if_key, then_key);
-        }
+        self.connect(self.cur_block_num, fi_key);
+        phis = self.generate_phi(self.cur_block_num, if_key);
 
         // else block check
         if self.current() == &Token::Else {
             // since else is optional
+            println!("BEFORE TABLE AT ELSE: {:?}\n\n\n\n", before_table);
             let else_key = self.create_new_block("else".to_string(), before_table);
             self.connect(if_key, else_key);
             self.set_dom(if_key, else_key);
             self.switch_block(else_key);
             self.stat_sequence();
 
+            self.connect(self.cur_block_num, fi_key);
+
             // phi function check
-            if self.cur_block_num != else_key {
-                self.connect(self.cur_block_num, fi_key);
-                phis = self.generate_phi(self.cur_block_num, else_key);
-            } else {
-                self.connect(else_key, fi_key);
-                phis = self.generate_phi(then_key, else_key);
-            }
+            println!("block num after else: {}", self.cur_block_num);
+            phis = self.update_phi(phis, self.cur_block_num);
+            println!(
+                "\n\n\nAFTER TABLE at UPDATE PHI: {:?}\n\n\n",
+                self.get_table_from_block(self.cur_block_num)
+            );
+
             // add branch call instruction
             self.add_inst_to_tail(Operator::Bra(fi_block_name));
             self.switch_block(else_key);
@@ -559,10 +557,11 @@ impl Parser {
     /// while_statement
     /// "while" relaton "do" StatSequence "od"
     fn while_statement(&mut self) {
-        let before_table = self.vars.clone();
+        let before_table = self.get_current_table();
 
         // while block
         let while_key = self.create_new_block("while".to_string(), before_table.clone());
+        let while_block_name = "while_".to_string() + &while_key.to_string();
 
         // do block
         let do_key = self.create_new_block("do".to_string(), before_table.clone());
@@ -585,16 +584,12 @@ impl Parser {
         // do check
         self.switch_block(do_key);
         self.stat_sequence();
+        self.add_inst_to_tail(Operator::Bra(while_block_name));
 
         // generate phi function(s)
         let phis;
-        if self.cur_block_num == do_key {
-            self.connect(do_key, while_key);
-            phis = self.generate_phi(while_key, do_key);
-        } else {
-            self.connect(self.cur_block_num, while_key);
-            phis = self.generate_phi(while_key, self.cur_block_num);
-        }
+        self.connect(self.cur_block_num, while_key);
+        phis = self.generate_phi(while_key, self.cur_block_num);
         if self.current() != &Token::Od {
             panic!("Error: Invalid While Statement Format, Missing \"od\"");
         }
@@ -608,6 +603,7 @@ impl Parser {
         for (var, phi) in phis {
             self.total_inst += 1;
             let phi_op = Operator::Phi(phi.0, phi.1);
+            println!("phi_op: {}", phi_op);
             let phi_inst = Inst::new(self.total_inst, phi_op);
             ori_to_new.insert(phi.0, self.total_inst);
             var_to_phi.insert(var, self.total_inst);
@@ -616,6 +612,7 @@ impl Parser {
         // update instruction based on phi
         self.update_by_phi(ori_to_new, while_key);
         self.update_table_with_insts(var_to_phi, while_key);
+        // add phi functions on while block
         for inst in phi_insts {
             let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
                 b
@@ -911,6 +908,8 @@ impl Parser {
             self.var_decl();
             self.move_token();
         }
+        let table = self.vars.clone();
+        println!("table at computation: {:?}", table);
 
         // User-defined functions
         while self.current() == &Token::Void || self.current() == &Token::Function {
@@ -919,7 +918,7 @@ impl Parser {
         }
 
         // initial block for main function
-        let main_key = self.create_new_block("main".to_string(), HashMap::new());
+        let main_key = self.create_new_block("main".to_string(), table);
         self.switch_block(self.total_block);
 
         if self.current() != &Token::Symbol(Symbol::OpenBrace) {
@@ -1087,6 +1086,7 @@ impl Parser {
         if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b.borrow_mut().update_table(var.clone(), inst_num);
             self.vars.insert(var, Some(inst_num));
+            println!("\n\n\nVAR AFTER UPDATE TABLE: {:?} \n\n\n", self.vars);
         }
     }
 
@@ -1134,17 +1134,42 @@ impl Parser {
     /// generate phi functions comparing two blocks (pre & now)
     ///
     /// return the information containing variable, previous instruction and current instruction number
-    fn generate_phi(&mut self, pre_key: usize, now_key: usize) -> Vec<(String, (i32, i32))> {
+    fn generate_phi(&mut self, now_key: usize, pre_key: usize) -> HashMap<String, (i32, i32)> {
+        let mut phis = HashMap::new();
         if let (Some(pre), Some(now)) = (self.blocks.get(&pre_key), self.blocks.get(&now_key)) {
+            println!(
+                "generate phi's pre and now: {:?} : {:?}",
+                pre.borrow().get_table(),
+                now.borrow().get_table()
+            );
             let vars = pre.borrow().compare_table(now);
-            let mut phis = Vec::new();
-            for (var, (pre_b, b)) in vars {
-                let phi_inst = (pre_b, b);
-                phis.push((var, phi_inst));
+
+            for (var, phi_insts) in vars {
+                phis.insert(var, phi_insts);
             }
-            return phis;
+            println!("Phi after generation: {:?}", phis);
         }
-        vec![]
+        return phis;
+    }
+
+    fn update_phi(
+        &mut self,
+        mut phis: HashMap<String, (i32, i32)>,
+        new_key: usize,
+    ) -> HashMap<String, (i32, i32)> {
+        println!("PHI insts befre update_phi: {:?}", phis);
+        if let Some(b) = self.blocks.get(&new_key) {
+            let b_table = b.borrow().get_table();
+            for (var, insts) in phis.clone() {
+                if let Some(Some(i)) = b_table.get(&var) {
+                    println!("Current Inst: {:?}", insts);
+                    let new_insts = (insts.0, *i);
+                    println!("New Insts: {:?}", new_insts);
+                    phis.insert(var, new_insts);
+                }
+            }
+        }
+        phis
     }
 
     /// update_by_phi
@@ -1155,8 +1180,13 @@ impl Parser {
     ///
     /// update instructions based on phi function info
     fn update_by_phi(&mut self, phis: HashMap<i32, i32>, start_key: usize) {
+        println!("\nUPDATE_BY_PHI:\n");
         for i in start_key..self.total_block + 1 {
             if let Some(block) = self.blocks.get(&i) {
+                println!(
+                    "Block name for update_by_phi: {}",
+                    block.borrow().get_block_name()
+                );
                 block.borrow_mut().update_inst(&phis);
             }
         }
@@ -1220,6 +1250,13 @@ impl Parser {
             return Some(block.borrow().get_block_name());
         }
         None
+    }
+
+    fn get_current_table(&self) -> HashMap<String, Option<i32>> {
+        if let Some(block) = self.blocks.get(&self.cur_block_num) {
+            return block.borrow().get_table();
+        }
+        panic!("No Table for Current Block");
     }
 
     /// is_void
@@ -1521,7 +1558,7 @@ fi
             if 1 > 2 then
     let a <- a - 1;
     else
-    let a <- a;
+    let a <- a + 3;
 fi
     }.",
         );
@@ -1544,9 +1581,10 @@ fi
                 if 1 == 2 then
                     let a <- a - 1;
                 fi;
-                else 
-                    if 1 == 3 then let a <- a - 1; fi;
-                let a <- 67 + 67;
+            else 
+                if 1 == 3 then 
+                    let a <- a - 1; 
+                fi;
             fi;
         let a <- 2;
     }.",
@@ -1567,22 +1605,25 @@ fi
             if 1 == 2 then
                 let a <- a + 1;
                 if 1 == 2 then
-                    let a <- a;
+                    let a <- a - 1;
                 else 
-                    let a <- 1;
+                    let a <- 1 + 4;
                 fi;
-                else 
-                    if 1 == 3 then let a <- a - 1; fi;
-                let a <- 67 + 67;
+            else 
+                if 1 == 3 then 
+                    let a <- a - 1; 
+                fi;
             fi;
         let a <- 2;
     }.",
         );
+        // bug: no phi for a <- a; else a <- a - 1;
         let mut parse = Parser::new(input);
         parse.computation();
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
     #[test]
     fn nested_while() {
@@ -1594,7 +1635,6 @@ fi
                 while 1 == a do 
                     let a <- a - 1;
                 od;
-            let a <- a + 1;
             od
     }.",
         );
@@ -1614,9 +1654,7 @@ fi
         let a <- 1;
             while 1 == a do
                 while 1 == a do 
-                    while 2 == a do
-                        let a <- a - 1;
-                    od;
+                    let a <- a + 3;
                 od;
             let a <- a + 1;
             od
@@ -1638,7 +1676,7 @@ fi
         let a <- 1 + b;
             while 1 == a do
                 let b <- 2;
-                let a <- 1 + b;
+                let a <- b + 1;
                 od
     }.",
         );
@@ -1657,7 +1695,7 @@ fi
         var a, b; {
         let a <- 1 + b;
             while 1 == a do
-                let a <- 1 + b;
+                let a <- a + 2;
             od
     }.",
         );
@@ -1677,8 +1715,8 @@ fi
         let a <- 1;
         if 1 == 2 then
             while 1 == a do
-                    let a <- a - 1;
-                od;
+                let a <- a - 1;
+            od;
         fi;
     }.",
         );
@@ -1687,8 +1725,9 @@ fi
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
+        parse.visualize_ir();
     }
-    // bug: bra for while loop
+
     #[test]
     fn if_else_while_test() {
         let input = String::from(
@@ -1715,7 +1754,31 @@ fi
     }
 
     #[test]
-    fn while_if_test() {
+    fn while_while_test() {
+        let input = String::from(
+            "main
+        var a; {
+        let a <- 1;
+        let b <- 2;
+        while 1 == a do
+                
+            while 1 == a do 
+                let a <- a + 1;
+            od;
+            let b <- 3;
+        od;
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn while_if_test1() {
         let input = String::from(
             "main
         var a; {
@@ -1723,10 +1786,7 @@ fi
         while 1 == 2 do
             if 1 == a then
                 let a <- a - 1;
-            else 
-                while 1 == a do 
-                    let a <- a + 1;
-                od;
+            else let a <- a + 3;
             fi;
         od;
         let a <- a + 1;
