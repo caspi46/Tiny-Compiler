@@ -430,6 +430,8 @@ impl Parser {
                             let set_param2 = Operator::SetPar2(param2);
                             let inst_num = self.add_inst_to_tail(set_param2.clone());
                             self.insts.insert(set_param2, inst_num);
+                        } else {
+                            panic!("Error: Parameter # mismatching");
                         }
                     }
                     if self.current() == &Token::Symbol(Symbol::Comma) {
@@ -438,6 +440,8 @@ impl Parser {
                             let set_param3 = Operator::SetPar3(param3);
                             let inst_num = self.add_inst_to_tail(set_param3.clone());
                             self.insts.insert(set_param3, inst_num);
+                        } else {
+                            panic!("Error: Parameter # mismatching");
                         }
                     }
                     if params > 3 {
@@ -640,7 +644,7 @@ impl Parser {
     /// "return" [ expression ]
     fn return_statement(&mut self) {
         let return_var = self.expression();
-        let return_op = Operator::Ret(return_var);
+        let return_op = Operator::Ret(Some(return_var));
         self.add_inst_to_tail(return_op);
     }
 
@@ -745,17 +749,12 @@ impl Parser {
             _ => panic!("Error: Missing function name: Ident(_)"),
         };
 
-        // void check
-        if is_void {
-            self.void_funcs.push(func_name.clone());
-        }
-
         // block0 for the user-defined function
         let func_block0_key = self.create_new_block(func_name.clone() + &"0", HashMap::new());
         self.switch_block0(func_block0_key);
 
         // initial block for user-defined function
-        let func_key: usize = self.create_new_block(func_name, HashMap::new());
+        let func_key: usize = self.create_new_block(func_name.clone(), HashMap::new());
         self.switch_block(func_key);
 
         self.connect(func_block0_key, func_key);
@@ -777,6 +776,12 @@ impl Parser {
         }
         if self.current() != &Token::Symbol(Symbol::SemiColon) {
             panic!("Error: Missing Semicolon for func body");
+        }
+
+        // void check
+        if is_void {
+            self.add_inst_to_tail(Operator::Ret(None));
+            self.void_funcs.push(func_name);
         }
 
         // back up
@@ -1307,7 +1312,7 @@ impl Parser {
 }
 
 /// Tests:
-/// TODO: the cases: 
+/// TODO: the cases:
 ///     Bug for if statement (unitialized variable)
 #[cfg(test)]
 mod tests {
@@ -1361,10 +1366,10 @@ mod tests {
             "main
         var a, b, c; {
             let b <- a + 1;
-            let b <- 1 +a;
+            let b <- 1- 1;
             let b <- a * 2; 
             let a <- 2;
-            let b <- 2 *a;
+            let b <- 2* a;
     }.",
         );
         let mut parse = Parser::new(input);
@@ -1683,7 +1688,7 @@ fi
         parse.show_insts();
         parse.show_blocks();
     }
-    // bug: bra for while loop 
+    // bug: bra for while loop
     #[test]
     fn if_else_while_test() {
         let input = String::from(
@@ -1907,16 +1912,16 @@ fi
             "main
     var a, b, e;
 
-    void function sum(a, b); var c; {
+    void function sum(a); var c; {
         let c <- a + d;
-        let a <- a + d; 
+        let a <- a + d;
     };
 
     {
     let a <- 1;
     let b <- 2; 
     let e <- 3;
-    call sum(a, b);
+    call sum(a);
     call OutputNum(a);
     }
     .",
@@ -1989,7 +1994,7 @@ fi
         parse.visualize_ir();
     }
 
-     #[test]
+    #[test]
     fn long_test() {
         let input = String::from(
             "main
@@ -2122,6 +2127,39 @@ var a, b, c, d;
     call OutputNum(b);
     }
     .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn github_test1() {
+        let input = String::from(
+            "main
+var zoink67, legalegends;
+
+{
+let zoink67 <- 1;
+let legalegends <- 2;
+
+if 1 < 2 then
+    let zoink67 <- 1 + 1 + 1 + 1;
+else
+    let zoink67 <- 67 + 67;
+fi;
+
+if 1 == 2 then
+    let zoink67 <- 1 - 1;
+fi;
+
+let zoink67 <- 67;
+
+}
+.",
         );
         let mut parse = Parser::new(input);
         parse.computation();

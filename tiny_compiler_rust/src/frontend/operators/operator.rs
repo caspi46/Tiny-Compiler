@@ -30,7 +30,7 @@ pub enum Operator {
     WriteNL,
     // Operator for user-defined functions
     Jsr(String), // block name
-    Ret(i32),
+    Ret(Option<i32>),
     // For now, only three parameters
     GetPar1,
     GetPar2,
@@ -69,7 +69,8 @@ impl fmt::Display for Operator {
             Operator::WriteNL => write!(f, "writeNL"),
 
             Operator::Jsr(b) => write!(f, "jsr {}", b),
-            Operator::Ret(x) => write!(f, "ret {}", x),
+            Operator::Ret(Some(x)) => write!(f, "ret {}", x),
+            Operator::Ret(None) => write!(f, "ret"),
 
             Operator::GetPar1 => write!(f, "getPar1"),
             Operator::GetPar2 => write!(f, "getPar2"),

@@ -70,10 +70,7 @@ impl<'a> Inst {
 
     pub fn get_op_one(self) -> Option<i32> {
         match self.op {
-            Operator::SetPar1(a)
-            | Operator::SetPar2(a)
-            | Operator::SetPar3(a)
-            | Operator::Ret(a) => Some(a),
+            Operator::SetPar1(a) | Operator::SetPar2(a) | Operator::SetPar3(a) => Some(a),
             _ => None,
         }
     }
@@ -107,7 +104,7 @@ impl<'a> Inst {
             Operator::SetPar1(_) => Some(Operator::SetPar1(updated_a)),
             Operator::SetPar2(_) => Some(Operator::SetPar2(updated_a)),
             Operator::SetPar3(_) => Some(Operator::SetPar3(updated_a)),
-            Operator::Ret(_) => Some(Operator::Ret(updated_a)),
+            Operator::Ret(_) => Some(Operator::Ret(Some(updated_a))),
             _ => None,
         };
         if let Some(op) = updated_op {
