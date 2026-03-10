@@ -1307,6 +1307,8 @@ impl Parser {
 }
 
 /// Tests:
+/// TODO: the cases: 
+///     Bug for if statement (unitialized variable)
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1490,10 +1492,11 @@ mod tests {
     fn if_statement_test1() {
         let input = String::from(
             "main
-        var a; {
-        let a <- call InputNum();
+        var a, b; {
+
             if 1 == 2 then
-    let a <- a - 1;
+                let b <- 2;
+
 fi
     }.",
         );
@@ -1623,17 +1626,37 @@ fi
     }
 
     #[test]
-    fn while_test() {
+    fn while_test1() {
         let input = String::from(
             "main
-        var a; {
-        let a <- 1;
+        var a, b; {
+        let a <- 1 + b;
             while 1 == a do
-                
-                    let a <- a - 1;
+                let b <- 2;
+                let a <- 1 + b;
                 od
     }.",
         );
+        // bug: phi function for uninitialized variable
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+    #[test]
+    fn while_test2() {
+        let input = String::from(
+            "main
+        var a, b; {
+        let a <- 1 + b;
+            while 1 == a do
+                let a <- 1 + b;
+            od
+    }.",
+        );
+        // bug: phi function for uninitialized variable
         let mut parse = Parser::new(input);
         parse.computation();
         parse.show_vars();
@@ -1649,7 +1672,6 @@ fi
         let a <- 1;
         if 1 == 2 then
             while 1 == a do
-                
                     let a <- a - 1;
                 od;
         fi;
@@ -1661,6 +1683,7 @@ fi
         parse.show_insts();
         parse.show_blocks();
     }
+    // bug: bra for while loop 
     #[test]
     fn if_else_while_test() {
         let input = String::from(
@@ -1669,9 +1692,8 @@ fi
         let a <- 1;
         if 1 == 2 then
             while 1 == a do
-                
-                    let a <- a - 1;
-                od;
+                let a <- a - 1;
+            od;
         else 
             while 1 == a do 
                 let a <- a + 1;
@@ -1784,7 +1806,7 @@ fi
     var a, b;
 
     function sum(a, b); var c; {
-        let c <- a - 1;
+        let c <- a - 1 - 3; 
         return c;
     };
 
@@ -1866,7 +1888,36 @@ fi
     let a <- 1;
     let b <- 2; 
     let e <- 3;
-    call OutputNum(call sum(a, b));
+    call OutputNum(call sum(a, b, c));
+    }
+    .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    // ret value for void function
+    #[test]
+    fn void_test() {
+        let input = String::from(
+            "main
+    var a, b, e;
+
+    void function sum(a, b); var c; {
+        let c <- a + d;
+        let a <- a + d; 
+    };
+
+    {
+    let a <- 1;
+    let b <- 2; 
+    let e <- 3;
+    call sum(a, b);
+    call OutputNum(a);
     }
     .",
         );
@@ -1929,6 +1980,46 @@ fi
     fi;
     }
     .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+     #[test]
+    fn long_test() {
+        let input = String::from(
+            "main
+var a, b, c, d;
+{
+    let a <- call InputNum();
+    let b <- 0;
+    let c <- 1;
+    let d <- 0;
+    while a > 0 do
+        if a < 10 then
+            let b <- b + c;
+            let c <- c + 1;
+            while d < 3 do
+                let b <- b + a;
+                let d <- d + 1;
+            od;
+            let a <- a - 1;
+        else
+            let c <- c * 2;
+            let d <- 0;
+        fi;
+        let a <- a - 1;
+    od;
+    call OutputNum(a);
+    call OutputNum(b);
+    call OutputNum(c);
+    call OutputNum(d);
+    call OutputNewLine();
+}.",
         );
         let mut parse = Parser::new(input);
         parse.computation();
