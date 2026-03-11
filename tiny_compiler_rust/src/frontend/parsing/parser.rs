@@ -1976,7 +1976,7 @@ fi
     fn func_func_call_test() {
         let input = String::from(
             "main
-    var a, b, e;
+    var b, e;
 
     function sum(a, b, d); var c; {
         let c <- a + d;
