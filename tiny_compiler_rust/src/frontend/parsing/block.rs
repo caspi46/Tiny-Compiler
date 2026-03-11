@@ -182,6 +182,9 @@ impl<'a> Block {
                 (Some(i), None) => {
                     updated_vars.insert(var, (i, 0));
                 }
+                (None, Some(i)) => {
+                    updated_vars.insert(var, (0, i));
+                }
                 _ => (),
             }
         }
@@ -271,6 +274,12 @@ impl<'a> Block {
             "\n\nInsts Before Opt: {:?} for this Block: {}\n\n\n",
             self.insts, self.block_name
         );
+
+        println!(
+            "
+        \n\n\nPhis Storage: {:?}",
+            inst_storage.get_phis()
+        );
         let mut delete_insts = HashMap::new();
 
         let mut insts: VecDeque<Inst> = VecDeque::new();
@@ -282,7 +291,8 @@ impl<'a> Block {
                 Operator::Add(_, _)
                 | Operator::Sub(_, _)
                 | Operator::Mul(_, _)
-                | Operator::Div(_, _) => {
+                | Operator::Div(_, _)
+                | Operator::Phi(_, _) => {
                     if let Some(opt_i) = inst_storage.get_inst_num(&check_op) {
                         if opt_i != check_i {
                             delete_insts.insert(check_i, opt_i);

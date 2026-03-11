@@ -6,16 +6,27 @@ use std::rc::Rc;
 pub struct Inst {
     inst_num: i32,
     op: Operator,
+    is_zero_x: bool,
+    is_zero_y: bool,
 }
 
 impl<'a> Inst {
-    pub fn new(
-        inst_num: i32,
-        op: Operator,
-        // prev: Option<*const Inst>,
-        // next: Option<*const Inst>,
-    ) -> Self {
-        Self { inst_num, op }
+    pub fn new(inst_num: i32, op: Operator) -> Self {
+        Self {
+            inst_num,
+            op,
+            is_zero_x: false,
+            is_zero_y: false,
+        }
+    }
+
+    pub fn new_zero_set(inst_num: i32, op: Operator, is_zero_x: bool, is_zero_y: bool) -> Self {
+        Self {
+            inst_num,
+            op,
+            is_zero_x,
+            is_zero_y,
+        }
     }
 
     // pub fn set_next(&mut self, next_inst: &Inst) {
@@ -220,16 +231,51 @@ impl<'a> Inst {
 
     pub fn update_const(&mut self) {
         let updated_op = match self.op {
-            Operator::Add(x, y) => Some(Operator::Add(x.abs(), y.abs())),
-            Operator::Sub(x, y) => Some(Operator::Sub(x.abs(), y.abs())),
-            Operator::Mul(x, y) => Some(Operator::Mul(x.abs(), y.abs())),
-            Operator::Div(x, y) => Some(Operator::Div(x.abs(), y.abs())),
-            Operator::Cmp(x, y) => Some(Operator::Cmp(x.abs(), y.abs())),
-            Operator::SetPar1(x) => Some(Operator::SetPar1(x.abs())),
-            Operator::SetPar2(x) => Some(Operator::SetPar2(x.abs())),
-            Operator::SetPar3(x) => Some(Operator::SetPar3(x.abs())),
-            Operator::Ret(Some(x)) => Some(Operator::Ret(Some(x.abs()))),
-            Operator::Write(x) => Some(Operator::Write(x.abs())),
+            Operator::Add(mut x, mut y) => {
+                x = if x == -100 { 0 } else { x };
+                y = if y == -100 { 0 } else { y };
+                Some(Operator::Add(x.abs(), y.abs()))
+            }
+            Operator::Sub(mut x, mut y) => {
+                x = if x == -100 { 0 } else { x };
+                y = if y == -100 { 0 } else { y };
+                Some(Operator::Sub(x.abs(), y.abs()))
+            }
+            Operator::Mul(mut x, mut y) => {
+                x = if x == -100 { 0 } else { x };
+                y = if y == -100 { 0 } else { y };
+                Some(Operator::Mul(x.abs(), y.abs()))
+            }
+            Operator::Div(mut x, mut y) => {
+                x = if x == -100 { 0 } else { x };
+                y = if y == -100 { 0 } else { y };
+                Some(Operator::Div(x.abs(), y.abs()))
+            }
+            Operator::Cmp(mut x, mut y) => {
+                x = if x == -100 { 0 } else { x };
+                y = if y == -100 { 0 } else { y };
+                Some(Operator::Cmp(x.abs(), y.abs()))
+            }
+            Operator::SetPar1(mut x) => {
+                x = if x == -100 { 0 } else { x };
+                Some(Operator::SetPar1(x.abs()))
+            }
+            Operator::SetPar2(mut x) => {
+                x = if x == -100 { 0 } else { x };
+                Some(Operator::SetPar2(x.abs()))
+            }
+            Operator::SetPar3(mut x) => {
+                x = if x == -100 { 0 } else { x };
+                Some(Operator::SetPar3(x.abs()))
+            }
+            Operator::Ret(Some(mut x)) => {
+                x = if x == -100 { 0 } else { x };
+                Some(Operator::Ret(Some(x.abs())))
+            }
+            Operator::Write(mut x) => {
+                x = if x == -100 { 0 } else { x };
+                Some(Operator::Write(x.abs()))
+            }
             _ => None,
         };
         if let Some(updated) = updated_op {

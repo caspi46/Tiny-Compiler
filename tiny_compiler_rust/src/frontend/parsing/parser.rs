@@ -155,6 +155,9 @@ impl Parser {
                 let op = Operator::Const(num);
                 self.move_token();
                 if let Some(i_num) = self.get_bb0(&op) {
+                    if i_num == 0 {
+                        return -100;
+                    }
                     return i_num * (-1);
                 }
 
@@ -228,15 +231,6 @@ impl Parser {
             self.inst_storage.add_muls(op.clone(), return_val);
             self.inst_storage.add_divs(op.clone(), return_val);
 
-            // if let Some(div) = self.inst_storage.add_divs(op.clone(), expected_num) {
-            //     return_val = if div == expected_num {
-            //         let inst_num = self.add_inst_to_tail(op.clone());
-            //         self.insts.insert(op, inst_num);
-            //         inst_num
-            //     } else {
-            //         div
-            //     };
-            // }
             x = return_val;
         }
         return_val
@@ -265,29 +259,6 @@ impl Parser {
             self.inst_storage.add_adds(op.clone(), return_val);
             self.inst_storage.add_subs(op, return_val);
 
-            // if let Some(add) = self.inst_storage.add_adds(op.clone(), expected_num) {
-            //     println!("Add return Val: {}", add);
-            //     return_val = if add == expected_num {
-            //         let inst_num = self.add_inst_to_tail(op.clone());
-            //         self.insts.insert(op.clone(), inst_num);
-            //         println!("Inst Num for add optimization: {}", inst_num);
-            //         inst_num
-            //     } else {
-            //         println!("Inst Num for no optimization add: {}", add);
-            //         add
-            //     };
-            // } else if let Some(sub) = self.inst_storage.add_subs(op.clone(), expected_num) {
-            //     return_val = if sub == expected_num {
-            //         let inst_num = self.add_inst_to_tail(op.clone());
-            //         self.insts.insert(op, inst_num);
-            //         println!("Inst Num for sub optimization: {}", inst_num);
-
-            //         inst_num
-            //     } else {
-            //         println!("Inst Num for no optimization sub: {}", sub);
-            //         sub
-            //     };
-            // }
             x = return_val;
         }
         return_val
@@ -334,7 +305,13 @@ impl Parser {
         println!("Current token before expression: {}", self.current());
         let rhs = self.expression(); // TODO: Return value (Identify the value)
 
-        let updated_rhs = if rhs > 0 { rhs } else { rhs * (-1) };
+        let updated_rhs = if rhs > 0 {
+            rhs
+        } else if rhs == -100 {
+            0
+        } else {
+            rhs * (-1)
+        };
         self.vars.insert(var.clone(), Some(updated_rhs));
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b
@@ -492,6 +469,8 @@ impl Parser {
         // then block check
         self.switch_block(then_key);
         self.stat_sequence();
+        // add branch call instruction
+        let end_then_key = self.total_block;
         self.connect(if_key, then_key);
 
         // generate phis for then
@@ -501,6 +480,8 @@ impl Parser {
 
         // else block check
         if self.current() == &Token::Else {
+            self.add_inst_to_tail(Operator::Bra(fi_block_name));
+
             // since else is optional
             println!("BEFORE TABLE AT ELSE: {:?}\n\n\n\n", before_table);
             let else_key = self.create_new_block("else".to_string(), before_table);
@@ -519,8 +500,6 @@ impl Parser {
                 self.get_table_from_block(self.cur_block_num)
             );
 
-            // add branch call instruction
-            self.add_inst_to_tail(Operator::Bra(fi_block_name));
             self.switch_block(else_key);
             let mut loc_rhs = (cond, "".to_string());
             if let Some(else_name) = self.get_current_block_name() {
@@ -549,6 +528,8 @@ impl Parser {
         self.switch_block(fi_key);
         for (var, phi) in phis {
             let phi_op = Operator::Phi(phi.0, phi.1);
+            self.inst_storage
+                .add_phis(phi_op.clone(), self.total_inst + 1);
             let inst_num = self.add_inst_to_tail(phi_op);
             self.update_table(var, inst_num);
         }
@@ -1646,12 +1627,36 @@ fi
         parse.show_blocks();
         parse.visualize_ir();
     }
+
+    #[test]
+    fn nested_if3() {
+        let input = String::from(
+            "main
+        var a; {
+            if 1 == 2 then
+                if 1 == 2 then
+                    let a <- a - 1;
+                fi;
+            else 
+                if 1 == 3 then 
+                    let a <- a - 1; 
+                fi;
+            fi;
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
     #[test]
     fn nested_while() {
         let input = String::from(
             "main
         var a; {
-        let a <- 1;
+        let a <- 2;
             while 1 == a do
                 while 1 == a do 
                     let a <- a - 1;
@@ -1716,9 +1721,9 @@ fi
         let input = String::from(
             "main
         var a, b; {
-        let a <- 1 + b;
             while 1 == a do
                 let a <- a + 2;
+                let b <- a;
             od
     }.",
         );
@@ -2077,6 +2082,8 @@ fi
         parse.visualize_ir();
     }
 
+    // 0 instruction bug!
+    // 0 in a > 0 becomes b's phi
     #[test]
     fn long_test() {
         let input = String::from(
