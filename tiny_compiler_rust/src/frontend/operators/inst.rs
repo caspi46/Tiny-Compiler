@@ -6,8 +6,8 @@ use std::rc::Rc;
 pub struct Inst {
     inst_num: i32,
     op: Operator,
-    is_zero_x: bool,
-    is_zero_y: bool,
+    x: String, 
+    y: String
 }
 
 impl<'a> Inst {
@@ -15,17 +15,8 @@ impl<'a> Inst {
         Self {
             inst_num,
             op,
-            is_zero_x: false,
-            is_zero_y: false,
-        }
-    }
-
-    pub fn new_zero_set(inst_num: i32, op: Operator, is_zero_x: bool, is_zero_y: bool) -> Self {
-        Self {
-            inst_num,
-            op,
-            is_zero_x,
-            is_zero_y,
+            x: "Const".to_string(), 
+            y: "Const".to_string(),
         }
     }
 

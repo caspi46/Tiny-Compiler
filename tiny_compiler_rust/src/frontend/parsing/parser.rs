@@ -228,8 +228,6 @@ impl Parser {
                 _ => panic!("Error, Invalid Div or Mul"),
             };
             return_val = self.add_inst_to_tail(op.clone());
-            self.inst_storage.add_muls(op.clone(), return_val);
-            self.inst_storage.add_divs(op.clone(), return_val);
 
             x = return_val;
         }
@@ -991,6 +989,12 @@ impl Parser {
         self.total_inst
     }
 
+    fn add_inst_to_storage(&mut self) {
+
+            // self.inst_storage.add_muls(op.clone(), return_val);
+            // self.inst_storage.add_divs(op.clone(), return_val);
+    }
+
     /// add_inst_to_head
     ///
     /// op: Operator
@@ -1558,6 +1562,7 @@ fi
         parse.show_blocks();
         parse.visualize_ir();
     }
+    // bug found for table update for if statement phis
     #[test]
     fn if_statement_test2() {
         let input = String::from(
@@ -1568,7 +1573,9 @@ fi
     let a <- a - 1;
     else
     let a <- a + 3;
-fi
+    let a <- a - 2;
+fi; 
+    let a <- a + 3;
     }.",
         );
         let mut parse = Parser::new(input);
@@ -1711,7 +1718,7 @@ fi
             let b <- 2;
             let a <- b + 1;
         od;
-        let a <- b + 1;
+        let a <- a + 1;
 
     }.",
         );
@@ -2162,6 +2169,46 @@ var a, b, c, d;
         parse.visualize_ir();
     }
 
+     #[test]
+    fn github_test() {
+        let input = String::from(
+            "main
+var a, b, c, d;
+{
+    let a <- call InputNum();
+    let b <- 0;
+    let c <- 1;
+    let d <- 0;
+    while a > 0 do
+        if a < 10 then
+            let b <- b + c;
+            let c <- c + 1;
+            while d < 3 do
+                let b <- b + a;
+                let d <- d + 1;
+            od;
+            let a <- a - 1;
+        else
+            let c <- c * 2;
+            let d <- 0;
+        fi;
+        let a <- a - 1;
+    od;
+    call OutputNum(a);
+    call OutputNum(b);
+    call OutputNum(c);
+    call OutputNum(d);
+    call OutputNewLine();
+}.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
     #[test]
     #[should_panic]
     fn detect_void_assignment() {
@@ -2257,6 +2304,59 @@ let zoink67 <- 67;
 
 }
 .",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+    // bug for CSE let b <- a + 1; & let b <- a + 1;
+    // timing of adding inst storage: should be after phi functions
+        #[test]
+    fn test2() {
+        let input = String::from(
+            "main
+var a, b, c; {
+    let a <- 3;
+    let b <- a;
+    let c <- b;
+
+    while a < 3 do
+        let b <- a + 1;
+        while b > 4 do
+            let c <- c + 1;
+            let b <- b - 1;
+        od;
+        let a <- a + 1;
+    od;
+}
+.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+       #[test]
+    fn test3_from_video() {
+        let input = String::from(
+            "main
+var x, y, i, j; {
+    let i <- 5;
+    let x <- 0;
+    let y <- 0;
+    let j <- i;
+    while x < 10 do
+        let x <- i + 1;
+        let y <- j + 1;
+        let i <- i + 1;
+    od;
+}.",
         );
         let mut parse = Parser::new(input);
         parse.computation();
