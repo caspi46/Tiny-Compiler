@@ -219,6 +219,21 @@ impl<'a> Inst {
     }
 
     pub fn update_const(&mut self) {
-        // take out negative sign 
+        let updated_op = match self.op {
+            Operator::Add(x, y) => Some(Operator::Add(x.abs(), y.abs())),
+            Operator::Sub(x, y) => Some(Operator::Sub(x.abs(), y.abs())),
+            Operator::Mul(x, y) => Some(Operator::Mul(x.abs(), y.abs())),
+            Operator::Div(x, y) => Some(Operator::Div(x.abs(), y.abs())),
+            Operator::Cmp(x, y) => Some(Operator::Cmp(x.abs(), y.abs())),
+            Operator::SetPar1(x) => Some(Operator::SetPar1(x.abs())),
+            Operator::SetPar2(x) => Some(Operator::SetPar2(x.abs())),
+            Operator::SetPar3(x) => Some(Operator::SetPar3(x.abs())),
+            Operator::Ret(Some(x)) => Some(Operator::Ret(Some(x.abs()))),
+            Operator::Write(x) => Some(Operator::Write(x.abs())),
+            _ => None,
+        };
+        if let Some(updated) = updated_op {
+            self.op = updated;
+        }
     }
 }

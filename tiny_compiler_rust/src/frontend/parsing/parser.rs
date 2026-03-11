@@ -221,9 +221,9 @@ impl Parser {
                 _ => panic!("Error, Invalid Div or Mul"),
             };
             return_val = self.add_inst_to_tail(op.clone());
-            // self.inst_storage.add_muls(op.clone(), expected_num); 
-            // self.inst_storage.add_divs(op.clone(), expected_num); 
-            
+            // self.inst_storage.add_muls(op.clone(), expected_num);
+            // self.inst_storage.add_divs(op.clone(), expected_num);
+
             // if let Some(div) = self.inst_storage.add_divs(op.clone(), expected_num) {
             //     return_val = if div == expected_num {
             //         let inst_num = self.add_inst_to_tail(op.clone());
@@ -258,7 +258,7 @@ impl Parser {
                 _ => panic!("Error: Invalid ADD or SUB format"),
             };
             return_val = self.add_inst_to_tail(op.clone());
-            self.inst_storage.add_adds(op.clone(), return_val); 
+            self.inst_storage.add_adds(op.clone(), return_val);
             self.inst_storage.add_subs(op, return_val);
 
             // if let Some(add) = self.inst_storage.add_adds(op.clone(), expected_num) {
@@ -939,6 +939,7 @@ impl Parser {
         }
         self.add_inst_to_tail(Operator::End);
         self.connect(0, main_key);
+        self.set_positive();
     }
 
     /// helper functions to add instruction to the current block
@@ -1270,9 +1271,11 @@ impl Parser {
         true
     }
 
-    fn set_postive(&mut self) {
-        for bb in self.blocks.clone(){
-            bb.1.borrow_mut().set_no_const_sign();
+    fn set_positive(&mut self) {
+        for i in 0..self.total_block + 1 {
+            if let Some(bb) = self.blocks.get(&i) {
+                bb.borrow_mut().set_no_const_sign();
+            }
         }
     }
 

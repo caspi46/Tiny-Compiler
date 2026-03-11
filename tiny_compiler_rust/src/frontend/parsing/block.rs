@@ -261,9 +261,12 @@ impl<'a> Block {
     }
 
     pub fn set_no_const_sign(&mut self) {
+        let mut insts: VecDeque<Inst> = VecDeque::new();
         for mut inst in self.insts.clone() {
-            inst.update_const(); 
+            inst.update_const();
+            insts.push_back(inst);
         }
+        self.insts = insts.clone();
     }
 
     // pub fn fill_in_table(&mut self, ident: Ident, inst_num: i32) {
