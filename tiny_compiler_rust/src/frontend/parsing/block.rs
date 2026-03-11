@@ -48,12 +48,6 @@ impl<'a> Block {
         }
     }
 
-    // /// add_prev
-    // /// add new prev block in block's prevs
-    // pub fn add_prev(&mut self, block_num: usize) {
-    //     self.prevs.borrow_mut().push(block_num);
-    // }
-
     pub fn get_block_name(&self) -> String {
         self.block_name.clone()
     }
@@ -267,6 +261,72 @@ impl<'a> Block {
             insts.push_back(inst);
         }
         self.insts = insts.clone();
+    }
+
+    pub fn optimize_block(&mut self, inst_storage: &InstStorage) {
+        // variable table update
+        // instruction update
+        // remove instruction
+        println!(
+            "\n\nInsts Before Opt: {:?} for this Block: {}\n\n\n",
+            self.insts, self.block_name
+        );
+        let mut delete_insts = HashMap::new();
+
+        let mut insts: VecDeque<Inst> = VecDeque::new();
+        for inst in self.insts.clone() {
+            let check = inst.clone();
+            let check_i = check.clone().get_inst_num();
+            let check_op = check.clone().get_operator();
+            match check_op {
+                Operator::Add(_, _)
+                | Operator::Sub(_, _)
+                | Operator::Mul(_, _)
+                | Operator::Div(_, _) => {
+                    if let Some(opt_i) = inst_storage.get_inst_num(&check_op) {
+                        if opt_i != check_i {
+                            delete_insts.insert(check_i, opt_i);
+                            continue;
+                        }
+                    }
+                    insts.push_back(check);
+                }
+                _ => {
+                    insts.push_back(check);
+                }
+            }
+        }
+        for mut inst in insts.clone() {
+            match inst.clone().get_op_two() {
+                (Some(x), Some(y)) => {
+                    if let Some(v) = delete_insts.get(&x) {
+                        inst.update_op_inst1(*v);
+                    }
+                    if let Some(v) = delete_insts.get(&y) {
+                        inst.update_op_inst2(*v);
+                    }
+                    continue;
+                }
+                _ => (),
+            }
+
+            match inst.clone().get_op_one() {
+                Some(x) => {
+                    if let Some(v) = delete_insts.get(&x) {
+                        inst.update_op_inst1(*v);
+                    }
+                }
+                _ => (),
+            }
+        }
+        self.insts = insts;
+        for (var, i) in self.table.clone() {
+            if let Some(inst) = i
+                && let Some(opt_i) = delete_insts.get(&inst)
+            {
+                self.table.insert(var, Some(*opt_i));
+            }
+        }
     }
 
     // pub fn fill_in_table(&mut self, ident: Ident, inst_num: i32) {

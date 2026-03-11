@@ -18,6 +18,7 @@ pub struct InstStorage {
     subs: HashMap<Operator, i32>,
     muls: HashMap<Operator, i32>,
     divs: HashMap<Operator, i32>,
+    all_opt_insts: Vec<i32>,
 }
 
 impl InstStorage {
@@ -27,14 +28,19 @@ impl InstStorage {
             subs: HashMap::new(),
             muls: HashMap::new(),
             divs: HashMap::new(),
+            all_opt_insts: Vec::new(),
         }
     }
 
     pub fn add_adds(&mut self, new_add: Operator, inst_num: i32) -> Option<i32> {
-        if !matches!(new_add, Operator::Add(_, _)) {
-            return None;
-        }
-        match new_add {
+        let new_abs_add = match new_add {
+            Operator::Add(x, y) => Operator::Add(x.abs(), y.abs()),
+            _ => {
+                return None;
+            }
+        };
+
+        match new_abs_add {
             Operator::Add(x, y) => match self.muls.get(&Operator::Add(y, x)) {
                 Some(&i) => {
                     return Some(i);
@@ -43,49 +49,58 @@ impl InstStorage {
             },
             _ => panic!("Error: Failed to check add operator in storage"),
         };
-        if !self.muls.contains_key(&new_add) {
-            self.muls.insert(new_add, inst_num);
+        if !self.muls.contains_key(&new_abs_add) {
+            self.muls.insert(new_abs_add, inst_num);
             return Some(inst_num);
         }
-        match self.muls.get(&new_add) {
+        match self.muls.get(&new_abs_add) {
             Some(&i) => Some(i),
             _ => panic!("Error: Failed to add new mul operator in storage"),
         }
     }
 
     pub fn add_subs(&mut self, new_sub: Operator, inst_num: i32) -> Option<i32> {
-        if !matches!(new_sub, Operator::Sub(_, _)) {
-            return None;
-        }
-        if !self.subs.contains_key(&new_sub) {
-            self.subs.insert(new_sub, inst_num);
+        let new_abs_sub = match new_sub {
+            Operator::Sub(x, y) => Operator::Sub(x.abs(), y.abs()),
+            _ => {
+                return None;
+            }
+        };
+        if !self.subs.contains_key(&new_abs_sub) {
+            self.subs.insert(new_abs_sub, inst_num);
             return Some(inst_num);
         }
-        match self.subs.get(&new_sub) {
+        match self.subs.get(&new_abs_sub) {
             Some(&i) => Some(i),
             _ => panic!("Error: Failed to add new sub operator in storage"),
         }
     }
 
     pub fn add_divs(&mut self, new_div: Operator, inst_num: i32) -> Option<i32> {
-        if !matches!(new_div, Operator::Div(_, _)) {
-            return None;
-        }
-        if !self.divs.contains_key(&new_div) {
-            self.divs.insert(new_div, inst_num);
+        let new_abs_div = match new_div {
+            Operator::Div(x, y) => Operator::Div(x.abs(), y.abs()),
+            _ => {
+                return None;
+            }
+        };
+        if !self.divs.contains_key(&new_abs_div) {
+            self.divs.insert(new_abs_div, inst_num);
             return Some(inst_num);
         }
-        match self.divs.get(&new_div) {
+        match self.divs.get(&new_abs_div) {
             Some(&i) => Some(i),
             _ => panic!("Error: Failed to add new div operator in storage"),
         }
     }
 
     pub fn add_muls(&mut self, new_mul: Operator, inst_num: i32) -> Option<i32> {
-        if !matches!(new_mul, Operator::Mul(_, _)) {
-            return None;
-        }
-        match new_mul {
+        let new_abs_mul = match new_mul {
+            Operator::Mul(x, y) => Operator::Mul(x.abs(), y.abs()),
+            _ => {
+                return None;
+            }
+        };
+        match new_abs_mul {
             Operator::Mul(x, y) => match self.muls.get(&Operator::Mul(y, x)) {
                 Some(&i) => {
                     return Some(i);
@@ -94,13 +109,75 @@ impl InstStorage {
             },
             _ => panic!("Error: Failed to check add operator in storage"),
         };
-        if !self.muls.contains_key(&new_mul) {
-            self.muls.insert(new_mul, inst_num);
+        if !self.muls.contains_key(&new_abs_mul) {
+            self.muls.insert(new_abs_mul, inst_num);
             return Some(inst_num);
         }
-        match self.muls.get(&new_mul) {
+        match self.muls.get(&new_abs_mul) {
             Some(&i) => Some(i),
             _ => panic!("Error: Failed to add new mul operator in storage"),
         }
+    }
+    pub fn get_add(&self, add_op: &Operator) -> Option<i32> {
+        if let Some(i) = self.adds.get(add_op) {
+            return Some(*i);
+        }
+        None
+    }
+
+    pub fn get_sub(&self, sub_op: &Operator) -> Option<i32> {
+        if let Some(i) = self.subs.get(sub_op) {
+            return Some(*i);
+        }
+        None
+    }
+
+    pub fn get_mul(&self, mul_op: &Operator) -> Option<i32> {
+        if let Some(i) = self.muls.get(mul_op) {
+            return Some(*i);
+        }
+        None
+    }
+
+    pub fn get_div(&self, div_op: &Operator) -> Option<i32> {
+        if let Some(i) = self.muls.get(div_op) {
+            return Some(*i);
+        }
+        None
+    }
+
+    pub fn get_inst_num(&self, op: &Operator) -> Option<i32> {
+        match self.adds.get(op) {
+            Some(i) => {
+                return Some(*i);
+            }
+            _ => (),
+        }
+        match self.subs.get(op) {
+            Some(i) => {
+                return Some(*i);
+            }
+            _ => (),
+        }
+        match self.muls.get(op) {
+            Some(i) => {
+                return Some(*i);
+            }
+            _ => (),
+        }
+        match self.divs.get(op) {
+            Some(i) => {
+                return Some(*i);
+            }
+            _ => (),
+        }
+        None
+    }
+
+    pub fn get_opt_inst(&self, inst_num: &i32) -> Option<i32> {
+        if self.all_opt_insts.contains(inst_num) {
+            return Some(*inst_num);
+        }
+        None
     }
 }

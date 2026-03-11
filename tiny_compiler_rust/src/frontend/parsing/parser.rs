@@ -47,6 +47,7 @@ pub struct Parser {
     cur_token_index: usize,
     cur_block_num: usize,
     block0_num: usize,
+    block0s: Vec<usize>,
     total_inst: i32,
     total_block: usize,
     inst_storage: InstStorage,
@@ -65,6 +66,8 @@ impl Parser {
         block0.borrow_mut().push_head(zero_inst);
         let mut blocks = BTreeMap::new();
         blocks.insert(0, block0);
+        let mut block0s = Vec::new();
+        block0s.push(0);
 
         Self {
             tokens,
@@ -79,6 +82,7 @@ impl Parser {
             total_block: 0,
             inst_storage: InstStorage::new(),
             block0_num: 0, // block0 will be added to front at the end
+            block0s,
         }
     }
 
@@ -221,8 +225,8 @@ impl Parser {
                 _ => panic!("Error, Invalid Div or Mul"),
             };
             return_val = self.add_inst_to_tail(op.clone());
-            // self.inst_storage.add_muls(op.clone(), expected_num);
-            // self.inst_storage.add_divs(op.clone(), expected_num);
+            self.inst_storage.add_muls(op.clone(), return_val);
+            self.inst_storage.add_divs(op.clone(), return_val);
 
             // if let Some(div) = self.inst_storage.add_divs(op.clone(), expected_num) {
             //     return_val = if div == expected_num {
@@ -746,6 +750,7 @@ impl Parser {
         // block0 for the user-defined function
         let func_block0_key = self.create_new_block(func_name.clone() + &"0", HashMap::new());
         self.switch_block0(func_block0_key);
+        self.block0s.push(func_block0_key);
 
         // initial block for user-defined function
         let func_key: usize = self.create_new_block(func_name.clone(), HashMap::new());
@@ -940,6 +945,7 @@ impl Parser {
         self.add_inst_to_tail(Operator::End);
         self.connect(0, main_key);
         self.set_positive();
+        self.optimize();
     }
 
     /// helper functions to add instruction to the current block
@@ -1279,6 +1285,16 @@ impl Parser {
         }
     }
 
+    fn optimize(&mut self) {
+        for i in 0..self.total_block + 1 {
+            if !self.block0s.contains(&i)
+                && let Some(bb) = self.blocks.get(&i)
+            {
+                bb.borrow_mut().optimize_block(&self.inst_storage);
+            }
+        }
+    }
+
     /// get_bb0
     ///
     /// op: &Operator
@@ -1410,9 +1426,8 @@ mod tests {
         var a, b, c; {
             let b <- a + 1;
             let b <- 1- 1;
-            let b <- a * 2; 
-            let a <- 2;
-            let b <- 2* a;
+            let b <- a / 2; 
+            let b <- 2 * a;
     }.",
         );
         let mut parse = Parser::new(input);
@@ -1680,10 +1695,12 @@ fi
             "main
         var a, b; {
         let a <- 1;
-            while 1 == a do
-                let b <- 2;
-                let a <- b + 1;
-                od
+        while 1 == a do
+            let b <- 2;
+            let a <- b + 1;
+        od;
+        let a <- b + 1;
+
     }.",
         );
         // bug: phi function for uninitialized variable
