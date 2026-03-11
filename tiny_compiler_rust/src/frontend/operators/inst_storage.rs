@@ -18,7 +18,6 @@ pub struct InstStorage {
     subs: HashMap<Operator, i32>,
     muls: HashMap<Operator, i32>,
     divs: HashMap<Operator, i32>,
-    phis: HashMap<Operator, i32>,
 }
 
 impl InstStorage {
@@ -28,7 +27,6 @@ impl InstStorage {
             subs: HashMap::new(),
             muls: HashMap::new(),
             divs: HashMap::new(),
-            phis: HashMap::new(),
         }
     }
 
@@ -119,26 +117,6 @@ impl InstStorage {
         }
     }
 
-    pub fn add_phis(&mut self, new_phi: Operator, inst_num: i32) -> Option<i32> {
-        // let new_abs_div = match new_div {
-        //     Operator::Div(x, y) => Operator::Div(x.abs(), y.abs()),
-        //     _ => {
-        //         return None;
-        //     }
-        // };
-        if !matches!(new_phi, Operator::Phi(_, _)) {
-            return None;
-        }
-        if !self.phis.contains_key(&new_phi) {
-            self.phis.insert(new_phi, inst_num);
-            return Some(inst_num);
-        }
-        match self.phis.get(&new_phi) {
-            Some(&i) => Some(i),
-            _ => panic!("Error: Failed to add new div operator in storage"),
-        }
-    }
-
     pub fn get_add(&self, add_op: &Operator) -> Option<i32> {
         if let Some(i) = self.adds.get(add_op) {
             return Some(*i);
@@ -192,16 +170,6 @@ impl InstStorage {
             }
             _ => (),
         }
-        match self.phis.get(op) {
-            Some(i) => {
-                return Some(*i);
-            }
-            _ => (),
-        }
         None
-    }
-
-    pub fn get_phis(&self) -> &HashMap<Operator, i32> {
-        &self.phis
     }
 }

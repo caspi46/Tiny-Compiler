@@ -528,8 +528,6 @@ impl Parser {
         self.switch_block(fi_key);
         for (var, phi) in phis {
             let phi_op = Operator::Phi(phi.0, phi.1);
-            self.inst_storage
-                .add_phis(phi_op.clone(), self.total_inst + 1);
             let inst_num = self.add_inst_to_tail(phi_op);
             self.update_table(var, inst_num);
         }

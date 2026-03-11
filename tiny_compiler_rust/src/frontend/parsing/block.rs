@@ -275,11 +275,6 @@ impl<'a> Block {
             self.insts, self.block_name
         );
 
-        println!(
-            "
-        \n\n\nPhis Storage: {:?}",
-            inst_storage.get_phis()
-        );
         let mut delete_insts = HashMap::new();
 
         let mut insts: VecDeque<Inst> = VecDeque::new();
