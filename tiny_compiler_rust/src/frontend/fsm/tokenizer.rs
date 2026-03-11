@@ -194,14 +194,24 @@ impl Tokenizer {
         ch == ' ' || ch == '\n'
     }
 
-    fn is_negative(&self, ch: char, token: &str) -> bool {
-        if ch != '-' {
+    fn is_ch_num(&self, ch: char) -> bool {
+        ch == '0'
+            || ch == '1'
+            || ch == '2'
+            || ch == '3'
+            || ch == '4'
+            || ch == '5'
+            || ch == '6'
+            || ch == '7'
+            || ch == '8'
+            || ch == '9'
+    }
+
+    fn is_negative(&self, token: &str, ch: char) -> bool {
+        if token != "-" {
             return false;
         }
-        match token {
-            "" => true,
-            _ => false,
-        }
+        self.is_ch_num(ch)
     }
 
     fn check_token(&mut self, token: &str) -> bool {
@@ -226,13 +236,14 @@ impl Tokenizer {
             println!("current token: {}", cur_token);
             println!("current input element: {}", self.input[i]);
             let mut next = "".to_string();
-            // if self.is_negative(self.input[i], cur_str) {
-            //     next = self.input[i].to_string();
-            //     self.is_number(cur_str);
-            //     println!("Current Token:{}\nNext in is_neg:{}\n", cur_str, next);
-            // }
+            if self.is_negative(cur_str, self.input[i]) {
+                println!("IS NEGATIVE");
+                next = self.input[i].to_string();
+                self.is_op(cur_str);
+                println!("Current Token:{}\nNext in is_neg:{}\n", cur_str, next);
+            }
             // check the symbol
-            if !self.is_ch_symbol(self.input[i]) && self.is_symbol(cur_str) {
+            else if !self.is_ch_symbol(self.input[i]) && self.is_symbol(cur_str) {
                 next = self.input[i].to_string();
             } else if cur_str == "<" && self.input[i] == '-' {
                 // check <-

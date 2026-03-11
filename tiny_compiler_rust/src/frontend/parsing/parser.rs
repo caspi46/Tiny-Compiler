@@ -1413,9 +1413,9 @@ mod tests {
             "main
         var a, b, c; {
             let b <- a + 1;
-            let b <- 1- 1;
-            let b <- a / 2; 
-            let b <- 2 * a;
+            let b <- 1-1;
+            let b <- a/ 2; 
+            let b <- 2* a;
     }.",
         );
         let mut parse = Parser::new(input);
