@@ -332,7 +332,8 @@ impl Parser {
                 let op = Operator::Read;
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) != self.current() {
-                    panic!("Error: no open parenthesis for function call");
+                    let _ = self.add_inst_to_tail(op.clone());
+                    return self.total_inst;
                 }
                 self.move_token();
                 if &Token::Symbol(Symbol::CloseParen) != self.current() {
@@ -349,7 +350,8 @@ impl Parser {
                 let op = Operator::WriteNL;
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) != self.current() {
-                    panic!("Error: no open parenthesis for function call");
+                    let _ = self.add_inst_to_tail(op.clone());
+                    return self.total_inst;
                 }
                 self.move_token();
                 if &Token::Symbol(Symbol::CloseParen) != self.current() {
@@ -422,8 +424,10 @@ impl Parser {
                             panic!("Error: Parameter # mismatching");
                         }
                     }
-                    if params > 3 {
-                        panic!("Error: More than 3 Parameter for Function");
+                    if params == 0 {
+                        self.move_token();
+                    } else if params > 3 {
+                        panic!("Error: Parameters are more than 3. 3 is the max");
                     }
                     if &Token::Symbol(Symbol::CloseParen) != self.current() {
                         panic!(
@@ -436,7 +440,12 @@ impl Parser {
                     self.move_token();
                     self.total_inst
                 } else {
-                    panic!("Error: Missing Opened Paranthesis");
+                    if params == 0 {
+                        let inst_num = self.add_inst_to_tail(func_call.clone());
+                        self.insts.insert(func_call, inst_num);
+                        return self.total_inst;
+                    }
+                    panic!("Error: params required for function call");
                 }
             }
             _ => panic!("Error: Invalid funcCall format"),
@@ -1517,9 +1526,9 @@ mod tests {
             "main
         var a; {
             let a <- call InputNum();
-            call OutputNewLine();
+            call OutputNewLine;
             call OutputNum(a);
-            call OutputNum(call InputNum());
+            call OutputNum(call InputNum);
     }.",
         );
         let mut parse = Parser::new(input);
@@ -1868,16 +1877,16 @@ fi
     fn user_defined_test() {
         let input = String::from(
             "main
-    var a, b;
+    var b;
 
-    function sum(a); var c; {
+    function sum(); var c; {
         let c <- a;
         return c;
     };
 
     {
     let a <- 1;
-    let b <- call sum(a);
+    let b <- call sum();
     call OutputNum(b);
     }
     .",
@@ -2004,7 +2013,7 @@ fi
     };
 
     {
-    let a <- 1;
+    let a <- a + d;
     let b <- 2; 
     let e <- 3;
     call sum(a);
