@@ -217,4 +217,8 @@ impl<'a> Inst {
             self.op = op;
         }
     }
+
+    pub fn update_const(&mut self) {
+        // take out negative sign 
+    }
 }

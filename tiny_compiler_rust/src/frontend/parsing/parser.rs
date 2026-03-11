@@ -151,12 +151,12 @@ impl Parser {
                 let op = Operator::Const(num);
                 self.move_token();
                 if let Some(i_num) = self.get_bb0(&op) {
-                    return i_num;
+                    return i_num * (-1);
                 }
 
                 let inst_num = self.add_const_to_bb0(op);
                 println!("Num's Token: {}", inst_num);
-                return inst_num;
+                return inst_num * (-1);
             }
             // variable
             Token::Ident(UserDefined(var)) => {
@@ -220,25 +220,19 @@ impl Parser {
                 Token::Op(DIV) => Operator::Div(x, y),
                 _ => panic!("Error, Invalid Div or Mul"),
             };
-            let expected_num = self.total_inst + 1;
-            if let Some(mul) = self.inst_storage.add_muls(op.clone(), expected_num) {
-                return_val = if mul == expected_num {
-                    let inst_num = self.add_inst_to_tail(op.clone());
-                    self.insts.insert(op.clone(), inst_num);
-                    inst_num
-                } else {
-                    mul
-                };
-            }
-            if let Some(div) = self.inst_storage.add_divs(op.clone(), expected_num) {
-                return_val = if div == expected_num {
-                    let inst_num = self.add_inst_to_tail(op.clone());
-                    self.insts.insert(op, inst_num);
-                    inst_num
-                } else {
-                    div
-                };
-            }
+            return_val = self.add_inst_to_tail(op.clone());
+            // self.inst_storage.add_muls(op.clone(), expected_num); 
+            // self.inst_storage.add_divs(op.clone(), expected_num); 
+            
+            // if let Some(div) = self.inst_storage.add_divs(op.clone(), expected_num) {
+            //     return_val = if div == expected_num {
+            //         let inst_num = self.add_inst_to_tail(op.clone());
+            //         self.insts.insert(op, inst_num);
+            //         inst_num
+            //     } else {
+            //         div
+            //     };
+            // }
             x = return_val;
         }
         return_val
@@ -263,30 +257,33 @@ impl Parser {
                 Token::Op(SUB) => Operator::Sub(x, y),
                 _ => panic!("Error: Invalid ADD or SUB format"),
             };
-            let expected_num = self.total_inst + 1;
-            if let Some(add) = self.inst_storage.add_adds(op.clone(), expected_num) {
-                println!("Add return Val: {}", add);
-                return_val = if add == expected_num {
-                    let inst_num = self.add_inst_to_tail(op.clone());
-                    self.insts.insert(op.clone(), inst_num);
-                    println!("Inst Num for add optimization: {}", inst_num);
-                    inst_num
-                } else {
-                    println!("Inst Num for no optimization add: {}", add);
-                    add
-                };
-            } else if let Some(sub) = self.inst_storage.add_subs(op.clone(), expected_num) {
-                return_val = if sub == expected_num {
-                    let inst_num = self.add_inst_to_tail(op.clone());
-                    self.insts.insert(op, inst_num);
-                    println!("Inst Num for sub optimization: {}", inst_num);
+            return_val = self.add_inst_to_tail(op.clone());
+            self.inst_storage.add_adds(op.clone(), return_val); 
+            self.inst_storage.add_subs(op, return_val);
 
-                    inst_num
-                } else {
-                    println!("Inst Num for no optimization sub: {}", sub);
-                    sub
-                };
-            }
+            // if let Some(add) = self.inst_storage.add_adds(op.clone(), expected_num) {
+            //     println!("Add return Val: {}", add);
+            //     return_val = if add == expected_num {
+            //         let inst_num = self.add_inst_to_tail(op.clone());
+            //         self.insts.insert(op.clone(), inst_num);
+            //         println!("Inst Num for add optimization: {}", inst_num);
+            //         inst_num
+            //     } else {
+            //         println!("Inst Num for no optimization add: {}", add);
+            //         add
+            //     };
+            // } else if let Some(sub) = self.inst_storage.add_subs(op.clone(), expected_num) {
+            //     return_val = if sub == expected_num {
+            //         let inst_num = self.add_inst_to_tail(op.clone());
+            //         self.insts.insert(op, inst_num);
+            //         println!("Inst Num for sub optimization: {}", inst_num);
+
+            //         inst_num
+            //     } else {
+            //         println!("Inst Num for no optimization sub: {}", sub);
+            //         sub
+            //     };
+            // }
             x = return_val;
         }
         return_val
@@ -970,7 +967,7 @@ impl Parser {
     /// add constant variable to the current block 0
     fn add_const_to_bb0(&mut self, op: Operator) -> i32 {
         self.total_inst += 1;
-        let inst_num = self.total_inst * (-1);
+        let inst_num = self.total_inst;
         let new_const = Inst::new(inst_num, op.clone());
         let bb0 = if let Some(b) = self.blocks.get(&self.block0_num) {
             b
@@ -1271,6 +1268,12 @@ impl Parser {
             }
         }
         true
+    }
+
+    fn set_postive(&mut self) {
+        for bb in self.blocks.clone(){
+            bb.1.borrow_mut().set_no_const_sign();
+        }
     }
 
     /// get_bb0
@@ -1673,7 +1676,7 @@ fi
         let input = String::from(
             "main
         var a, b; {
-        let a <- 1 + b;
+        let a <- 1;
             while 1 == a do
                 let b <- 2;
                 let a <- b + 1;

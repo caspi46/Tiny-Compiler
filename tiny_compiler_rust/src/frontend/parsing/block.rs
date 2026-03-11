@@ -260,6 +260,12 @@ impl<'a> Block {
         return false;
     }
 
+    pub fn set_no_const_sign(&mut self) {
+        for mut inst in self.insts.clone() {
+            inst.update_const(); 
+        }
+    }
+
     // pub fn fill_in_table(&mut self, ident: Ident, inst_num: i32) {
     //     self.table.insert(ident, inst_num);
     // }
