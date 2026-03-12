@@ -1136,11 +1136,11 @@ impl Parser {
                         phis.insert(var, new_insts);
                     } else {
                         let pre_table = pre_b.borrow().get_table();
-                        if let Some(Some(x)) = pre_table.get(&var) {
+                        if let Some(Some(x)) = pre_table.get(&var)
+                            && *x != y
+                        {
                             let new_insts = (*x, y);
                             phis.insert(var, new_insts);
-                        } else {
-                            phis.insert(var, (0, y));
                         }
                     }
                 }
@@ -2404,25 +2404,27 @@ var x, y,i,j; {
     fn test_from_testcases() {
         let input = String::from(
             "main
-var x, y, z;
+var zoink67, legalegends;
+
 {
-    let x <- 1;
-    let y <- 2;
-    let z <- 0;
-    while x < 5 do
-        if y > 1 then
-            let x <- x + 1;
-            let z <- z + 1;
-        else
-            let y <- y + 1;
-        fi;
-        let x <- x + 1;
-    od;
-    call OutputNum(x);
-    call OutputNum(y);
-    call OutputNum(z);
-    
-}.
+let zoink67 <- 1;
+let legalegends <- 2;
+
+if 1 < 2 then
+    let zoink67 <- 1 + 1 + 1 + 1;
+else
+let x <- 1;
+    let zoink67 <- 67 + 67;
+fi;
+
+if 1 == 2 then
+    let zoink67 <- 1 - 1;
+fi;
+
+let zoink67 <- 67;
+
+}
+.
 ",
         );
         let mut parse = Parser::new(input);
