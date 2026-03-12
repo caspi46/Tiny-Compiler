@@ -137,8 +137,8 @@ impl Parser {
     ///     if so: check if it's a void or not. It must be non-void function
     ///            and move onto the function call (func_call)
     fn factor(&mut self) -> (i32, Option<String>) {
-        self.move_token();
         println!("Factor's current Token: {}", self.current());
+        self.move_token();
         let factor_token = self.current().clone();
         match factor_token {
             // ( )
@@ -291,7 +291,6 @@ impl Parser {
     /// "let" ident "<-"  expression
     fn assignment(&mut self) -> i32 {
         self.move_token();
-
         let var = match self.current() {
             Token::Ident(UserDefined(name)) => name.to_string(),
             _ => panic!("Error: Invalid Assignment Forat - Missing Variable"),
@@ -524,6 +523,10 @@ impl Parser {
         // add phi function instruction(s)
         self.switch_block(fi_key);
         for (var, phi) in phis {
+            if phi.0 == phi.1 {
+                self.update_table(var, phi.0);
+                continue;
+            }
             let phi_op = Operator::Phi(phi.0, phi.1);
             let inst_num = self.add_inst_to_tail(phi_op, (Some(var.clone()), Some(var.clone())));
             self.update_table(var, inst_num);
@@ -617,6 +620,13 @@ impl Parser {
     ///
     /// "return" [ expression ]
     fn return_statement(&mut self) {
+        println!("Current Token at Return: {}", self.current());
+        self.move_token();
+        if self.current() == &Token::Symbol(Symbol::SemiColon) {
+            self.add_inst_to_tail(Operator::Ret(None), (None, None));
+            return;
+        }
+        self.cur_token_index -= 1;
         let (return_inst, return_var) = self.expression();
         let return_op = Operator::Ret(Some(return_inst));
         self.add_inst_to_tail(return_op, (return_var, None));
@@ -651,6 +661,7 @@ impl Parser {
 
             // return statement
             Token::Return => {
+                println!("This is Return");
                 self.return_statement();
             }
 
@@ -754,7 +765,6 @@ impl Parser {
 
         // void check
         if is_void {
-            self.add_inst_to_tail(Operator::Ret(None), (None, None));
             self.void_funcs.push(func_name);
         }
 
@@ -1218,6 +1228,13 @@ impl Parser {
         None
     }
 
+    fn get_current_tail(&self) -> Option<Operator> {
+        if let Some(block) = self.blocks.get(&self.cur_block_num) {
+            return Some(block.borrow().get_tail_op());
+        }
+        None
+    }
+
     /// get_current_block_name
     ///
     /// return current block's block name (name + number)
@@ -1242,11 +1259,12 @@ impl Parser {
     /// check if the block (function) type is void or non-void
     fn is_void(&self, key: usize) -> bool {
         if let Some(block) = self.blocks.get(&key) {
-            if matches!(block.borrow().get_tail_op(), Operator::Ret(_)) {
-                return false;
-            }
+            return match block.borrow().get_tail_op() {
+                Operator::Ret(Some(_)) => false,
+                _ => true,
+            };
         }
-        true
+        false
     }
 
     fn set_positive(&mut self) {
@@ -1271,6 +1289,7 @@ impl Parser {
                 && let Some(t) = table_collector.get(&i)
                 && let Some(bb) = self.blocks.get(&i)
             {
+                println!("OPTIMIZE FULLY: {:?}", t);
                 for next in bb.borrow().get_nexts() {
                     if let Some(next_bb) = self.blocks.get(next) {
                         next_bb.borrow_mut().optimize_fully(t);
@@ -2416,32 +2435,32 @@ var x, y,i,j; {
     #[test]
     fn test_from_testcases() {
         let input = String::from(
-            "main
-var zoink67, legalegends;
+            "
 
+
+main
+var a, b; 
+
+void function compute(a, b); var c, d; {
+    let c <- a;
+    let d <- b;
+    call OutputNum(a);
+    call OutputNum(b);
+    if a + b == c + d then
+        call OutputNum(a + b + c + d);
+    else
+        call OutputNum(a + b - c - d);
+    fi;
+    return;
+};
 {
-let zoink67 <- 1;
-let legalegends <- 2;
-
-if 1 < 2 then
-    let zoink67 <- 1 + 1 + 1 + 1;
-    if 1 < 2 then
-        let zoink67 <- 0 + 0;
-    else
-        let zoink67 <- 1 + 1;
-    fi;
-else
-let zotnk67 <- 2 + 2 + 1 + 1;
-    if 67 < 67 then
-        let zoink67 <- 2 + 2;
-    else
-        let zoink67 <- 3 + 3;
-    fi;
-    let zoink67 <- 5 + 5;
-fi;
-
+let a <- 1;
+call OutputNum(b);
 }
 .
+
+
+
 ",
         );
         let mut parse = Parser::new(input);

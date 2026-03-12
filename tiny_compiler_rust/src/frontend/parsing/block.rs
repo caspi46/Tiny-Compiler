@@ -30,7 +30,6 @@ pub struct Block {
     inst_storage: InstStorage,
     nexts: Vec<usize>,
     doms: Vec<usize>,
-    opt_done: bool,
 }
 
 impl<'a> Block {
@@ -46,7 +45,6 @@ impl<'a> Block {
             nexts: Vec::new(),
             inst_storage: InstStorage::new(),
             doms: Vec::new(),
-            opt_done: false,
         }
     }
 
@@ -266,9 +264,6 @@ impl<'a> Block {
     }
 
     pub fn optimize_block(&mut self) -> HashMap<(i32, String), Option<i32>> {
-        if self.opt_done {
-            return HashMap::new();
-        }
         let mut delete_insts = HashMap::new();
         let mut table_collector = HashMap::new();
         let mut insts: VecDeque<Inst> = VecDeque::new();
@@ -364,6 +359,7 @@ impl<'a> Block {
                         inst.update_op_inst2(*opt_one);
                     }
                     opt_insts.push_back(inst.clone());
+                    continue;
                 }
                 _ => (),
             }
@@ -382,6 +378,7 @@ impl<'a> Block {
                 }
                 _ => (),
             }
+            opt_insts.push_back(inst);
         }
         self.insts = opt_insts;
         for (var, i) in self.table.clone() {
