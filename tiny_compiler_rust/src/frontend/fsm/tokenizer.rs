@@ -43,7 +43,6 @@ impl Tokenizer {
             "<=" => self.tokens.push(Token::RelOp(RelOp::LE)),
 
             _ => {
-                println!("Not relOp");
                 return false;
             }
         }
@@ -61,7 +60,6 @@ impl Tokenizer {
             "/" => self.tokens.push(Token::Op(Op::DIV)),
 
             _ => {
-                println!("Not op");
                 return false;
             }
         }
@@ -69,7 +67,6 @@ impl Tokenizer {
     }
 
     fn is_symbol(&mut self, cur_token: &str) -> bool {
-        println!("We're in Symbol section: {}", cur_token);
         match cur_token {
             "(" => self.tokens.push(Token::Symbol(Symbol::OpenParen)),
 
@@ -88,7 +85,6 @@ impl Tokenizer {
             "," => self.tokens.push(Token::Symbol(Symbol::Comma)),
 
             _ => {
-                println!("Not Symbol");
                 return false;
             }
         }
@@ -126,7 +122,6 @@ impl Tokenizer {
             "main" => self.tokens.push(Token::Main),
 
             _ => {
-                println!("Not reserved");
                 return false;
             }
         }
@@ -160,7 +155,6 @@ impl Tokenizer {
     }
 
     fn is_predefined_func(&mut self, cur_token: &str) -> bool {
-        println!("Hello, this is predefined function checker");
         match cur_token {
             "InputNum" => self.tokens.push(Token::Ident(Ident::InputNum)),
             "OutputNum" => self.tokens.push(Token::Ident(Ident::OutputNum)),
@@ -231,10 +225,7 @@ impl Tokenizer {
         };
         let mut i = 1;
         while i < self.input.len() {
-            println!("Enter the while loop");
             let cur_str = cur_token.as_str();
-            println!("current token: {}", cur_token);
-            println!("current input element: {}", self.input[i]);
             let mut next = "".to_string();
             if self.is_op(cur_str) {
                 next = self.input[i].to_string();
@@ -244,7 +235,6 @@ impl Tokenizer {
                 next = self.input[i].to_string();
             } else if cur_str == "<" && self.input[i] == '-' {
                 // check <-
-                println!("<- Checked!");
                 cur_token += &self.input[i].to_string();
                 self.is_symbol(cur_token.as_str());
             } else if self.is_ch_symbol(self.input[i]) && !cur_str.is_empty() {
@@ -254,7 +244,6 @@ impl Tokenizer {
                     panic!("Failed to add new token");
                 }
                 next = self.input[i].to_string();
-                println!("current token after last if statement: \"{}\"", cur_token);
             } else {
                 next = cur_token + &self.input[i].to_string();
             }
@@ -264,13 +253,6 @@ impl Tokenizer {
                 "".to_string()
             };
             i += 1;
-
-            // cur_token = if self.input[i] != ' ' {
-            //     cur_token + &self.input[i].to_string()
-            // } else {
-            //     self.input[i].to_string()
-            // };
-            // i += 1;
         }
         let cur_str = cur_token.as_str();
         if !cur_str.is_empty() {
@@ -279,11 +261,9 @@ impl Tokenizer {
                 panic!("Failed to add new token");
             }
         }
-        println!("Current token at the end: {}", cur_token);
     }
 
     pub fn get_tokens(self) -> Vec<Token> {
-        println!("Tokens: {:?}", self.tokens);
         self.tokens
     }
 }

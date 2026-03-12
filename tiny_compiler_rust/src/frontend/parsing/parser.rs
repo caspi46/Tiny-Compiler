@@ -50,7 +50,6 @@ pub struct Parser {
     block0s: Vec<usize>,
     total_inst: i32,
     total_block: usize,
-    inst_storage: InstStorage,
 }
 
 impl Parser {
@@ -80,7 +79,6 @@ impl Parser {
             cur_block_num: 0,
             total_inst: 0,
             total_block: 0,
-            inst_storage: InstStorage::new(),
             block0_num: 0, // block0 will be added to front at the end
             block0s,
         }
@@ -229,7 +227,6 @@ impl Parser {
             };
 
             return_val = self.add_inst_to_tail(op.clone(), (var1, var2));
-            // self.inst_storage.adds_term(op, return_val);
             var1 = None;
             x = return_val;
         }
@@ -256,10 +253,7 @@ impl Parser {
                 _ => panic!("Error: Invalid ADD or SUB format"),
             };
             return_val = self.add_inst_to_tail(op.clone(), (var1, var2));
-            // self.inst_storage.adds_expression(op, return_val);
             var1 = None;
-            // self.inst_storage.add_adds(op.clone(), return_val);
-            // self.inst_storage.add_subs(op, return_val);
 
             x = return_val;
         }
@@ -305,7 +299,7 @@ impl Parser {
             panic!("Error: Invalid Assignment Format, Missing \"<-\"");
         }
         println!("Current token before expression: {}", self.current());
-        let (rhs, _) = self.expression(); // TODO: Return value (Identify the value)
+        let (rhs, _) = self.expression();
 
         let updated_rhs = if rhs > 0 { rhs } else { rhs * (-1) };
         self.vars.insert(var.clone(), Some(updated_rhs));
@@ -490,7 +484,6 @@ impl Parser {
             self.add_inst_to_tail(Operator::Bra(fi_block_name), (None, None));
 
             // since else is optional
-            println!("BEFORE TABLE AT ELSE: {:?}\n\n\n\n", before_table);
             let else_key = self.create_new_block("else".to_string(), before_table);
             self.connect(if_key, else_key);
             self.set_dom(if_key, else_key);
@@ -500,12 +493,7 @@ impl Parser {
             self.connect(self.cur_block_num, fi_key);
 
             // phi function check
-            println!("block num after else: {}", self.cur_block_num);
             phis = self.update_phi(phis, self.cur_block_num);
-            println!(
-                "\n\n\nAFTER phi TABLE at UPDATE PHI: {:?}\n\n\n",
-                self.get_table_from_block(self.cur_block_num)
-            );
 
             self.switch_block(else_key);
             let mut loc_rhs = (cond, "".to_string());
@@ -591,7 +579,6 @@ impl Parser {
         for (var, phi) in phis {
             self.total_inst += 1;
             let phi_op = Operator::Phi(phi.0, phi.1);
-            println!("phi_op: {}", phi_op);
             let phi_inst = Inst::new(self.total_inst, phi_op, Some(var.clone()), None);
             var_to_pairs.insert(var.clone(), (phi.0, self.total_inst));
             var_to_phi.insert(var, self.total_inst);
@@ -707,7 +694,6 @@ impl Parser {
                 self.current()
             );
         }
-        self.inst_storage = InstStorage::new();
     }
 
     /// func_decl
@@ -790,21 +776,6 @@ impl Parser {
         let mut params = 0;
         self.move_token();
         if self.current() == &Token::Symbol(Symbol::OpenParen) {
-            // self.move_token();
-            // if matches!(self.current(), &Token::Ident(_)) {
-            //     // do something with identifier
-            //     params += 1;
-            // }
-            // self.move_token();
-            // while self.current() == &Token::Symbol(Symbol::Comma) {
-            //     self.move_token();
-            //     if matches!(self.current(), &Token::Ident(UserDefined(_))) {
-            //         // do something with identifier
-            //         params += 1;
-            //     }
-            //     self.move_token();
-            // }
-
             let mut op;
             let mut par;
             // param1:
@@ -817,7 +788,6 @@ impl Parser {
 
                     let par1_inst = self.add_inst_to_tail(op, (None, None));
                     self.update_table(par.to_string(), par1_inst);
-                    println!("vars : {:?}", self.vars);
                     self.move_token();
                 }
                 _ => (),
@@ -898,7 +868,6 @@ impl Parser {
             self.move_token();
         }
         let table = self.vars.clone();
-        println!("table at computation: {:?}", table);
 
         // User-defined functions
         while self.current() == &Token::Void || self.current() == &Token::Function {
@@ -921,7 +890,6 @@ impl Parser {
             );
         }
         self.move_token();
-        println!("Current Token after closed brace: {}", self.current());
 
         if self.current() != &Token::Symbol(Symbol::Period) {
             panic!(
@@ -933,7 +901,6 @@ impl Parser {
         self.connect(0, main_key);
         self.set_positive();
         self.add_to_storage();
-        println!("\n\n\nSTORAGE: {:?}", self.inst_storage);
         self.optimize();
     }
 
@@ -993,8 +960,6 @@ impl Parser {
     }
 
     fn add_to_storage(&mut self) {
-        // self.inst_storage.add_muls(op.clone(), return_val);
-        // self.inst_storage.add_divs(op.clone(), return_val);
         for i in 1..self.total_block + 1 {
             if !self.block0s.contains(&i)
                 && let Some(bb) = self.blocks.get(&i)
@@ -1010,23 +975,6 @@ impl Parser {
                 }
             }
         }
-    }
-
-    /// add_inst_to_head
-    ///
-    /// op: Operator
-    ///
-    /// add new instruction to the current block (Head)
-    fn add_inst_to_head(&mut self, op: Operator, x_y: (Option<String>, Option<String>)) -> i32 {
-        self.total_inst += 1;
-        let new_inst = Inst::new(self.total_inst, op, x_y.0, x_y.1);
-        let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
-            b
-        } else {
-            panic!("Error: No Block Found at {}", self.cur_block_num)
-        };
-        cur_block.borrow_mut().push_head(new_inst);
-        self.total_inst
     }
 
     /// swith_block
@@ -1063,15 +1011,6 @@ impl Parser {
         println!("Insts: {:?}", self.insts);
     }
 
-    /// show_inst_storage
-    ///
-    /// show instruction storage for function
-    ///
-    /// Used to see the information of instruction storage of the main function at the end
-    fn show_inst_storage(&self) {
-        println!("Inst Storage: {:?}", self.inst_storage);
-    }
-
     /// show_blocks
     ///
     /// show blocks
@@ -1099,7 +1038,6 @@ impl Parser {
         if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b.borrow_mut().update_table(var.clone(), inst_num);
             self.vars.insert(var, Some(inst_num));
-            println!("\n\n\nVAR AFTER UPDATE TABLE: {:?} \n\n\n", self.vars);
         }
     }
 
@@ -1150,17 +1088,11 @@ impl Parser {
     fn generate_phi(&mut self, now_key: usize, pre_key: usize) -> HashMap<String, (i32, i32)> {
         let mut phis = HashMap::new();
         if let (Some(pre), Some(now)) = (self.blocks.get(&pre_key), self.blocks.get(&now_key)) {
-            println!(
-                "generate phi's pre and now: {:?} : {:?}",
-                pre.borrow().get_table(),
-                now.borrow().get_table()
-            );
             let vars = pre.borrow().compare_table(now);
 
             for (var, phi_insts) in vars {
                 phis.insert(var, phi_insts);
             }
-            println!("Phi after generation: {:?}", phis);
         }
         return phis;
     }
@@ -1170,14 +1102,11 @@ impl Parser {
         mut phis: HashMap<String, (i32, i32)>,
         new_key: usize,
     ) -> HashMap<String, (i32, i32)> {
-        println!("PHI insts befre update_phi: {:?}", phis);
         if let Some(b) = self.blocks.get(&new_key) {
             let b_table = b.borrow().get_table();
             for (var, insts) in phis.clone() {
                 if let Some(Some(i)) = b_table.get(&var) {
-                    println!("Current Inst: {:?}", insts);
                     let new_insts = (insts.0, *i);
-                    println!("New Insts: {:?}", new_insts);
                     phis.insert(var, new_insts);
                 }
             }
@@ -1193,13 +1122,8 @@ impl Parser {
     ///
     /// update instructions based on phi function info
     fn update_by_phi(&mut self, phis: HashMap<String, (i32, i32)>, start_key: usize) {
-        println!("\nUPDATE_BY_PHI:\n");
         for i in start_key..self.total_block + 1 {
             if let Some(block) = self.blocks.get(&i) {
-                println!(
-                    "Block name for update_by_phi: {}",
-                    block.borrow().get_block_name()
-                );
                 block.borrow_mut().update_inst(&phis);
             }
         }
@@ -1472,7 +1396,7 @@ mod tests {
             if a == b then 
                 let c <- 1 + 1;
                 let b <- 3; 
-                let c <- b - 1;
+                let c <- a + b;
             fi;
             let b <- a + 1; 
     }.",
@@ -1581,7 +1505,7 @@ mod tests {
             "main
         var a, b; {
 
-            if 1 == 2 then
+            if 1 == 0 then
                 let b <- 2;
 
 fi
@@ -1908,7 +1832,6 @@ fi;
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();
-        parse.show_inst_storage();
         parse.visualize_ir();
     }
 

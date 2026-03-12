@@ -1,17 +1,9 @@
-use crate::frontend::operators::inst::Inst;
 use crate::frontend::operators::operator::Operator;
-use std::cell::Ref;
-use std::cell::RefCell;
 use std::collections::HashMap;
 // For optimization
 // each vector contains the each Inst type instructions
 // Every time new inst is created, it is added into the storage.
 
-// My thought process lol
-// The add function should be called before inserting it into block or insts
-// Since this is only for optimizing so far, this is not used for the actual Inst collection yet
-// But, depending on the situation, it could be used as collection
-// But, the collection is only for Add, Sub, Div, and Mul, so creating extra collection is unavoidable.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstStorage {
     adds: HashMap<Operator, i32>,
@@ -30,16 +22,6 @@ impl InstStorage {
             divs: HashMap::new(),
             // all_insts: HashMap::new(),
         }
-    }
-
-    pub fn adds_expression(&mut self, new_op: Operator, inst_num: i32) {
-        self.add_adds(new_op.clone(), inst_num);
-        self.add_subs(new_op, inst_num);
-    }
-
-    pub fn adds_term(&mut self, new_op: Operator, inst_num: i32) {
-        self.add_muls(new_op.clone(), inst_num);
-        self.add_divs(new_op, inst_num);
     }
 
     pub fn adds(&mut self, new_op: Operator, inst_num: i32) {
@@ -68,7 +50,6 @@ impl InstStorage {
         };
         if !self.adds.contains_key(&new_abs_add) {
             self.adds.insert(new_abs_add.clone(), inst_num);
-            // self.all_insts.insert(new_abs_add, inst_num);
             return Some(inst_num);
         }
         match self.adds.get(&new_abs_add) {
@@ -86,7 +67,6 @@ impl InstStorage {
         };
         if !self.subs.contains_key(&new_abs_sub) {
             self.subs.insert(new_abs_sub.clone(), inst_num);
-            // self.all_insts.insert(new_abs_sub, inst_num);
             return Some(inst_num);
         }
         match self.subs.get(&new_abs_sub) {
@@ -104,7 +84,6 @@ impl InstStorage {
         };
         if !self.divs.contains_key(&new_abs_div) {
             self.divs.insert(new_abs_div.clone(), inst_num);
-            // self.all_insts.insert(new_abs_div, inst_num);
             return Some(inst_num);
         }
         match self.divs.get(&new_abs_div) {
@@ -131,41 +110,12 @@ impl InstStorage {
         };
         if !self.muls.contains_key(&new_abs_mul) {
             self.muls.insert(new_abs_mul.clone(), inst_num);
-            // self.all_insts.insert(new_abs_mul, inst_num);
             return Some(inst_num);
         }
         match self.muls.get(&new_abs_mul) {
             Some(&i) => Some(i),
             _ => panic!("Error: Failed to add new mul operator in storage"),
         }
-    }
-
-    pub fn get_add(&self, add_op: &Operator) -> Option<i32> {
-        if let Some(i) = self.adds.get(add_op) {
-            return Some(*i);
-        }
-        None
-    }
-
-    pub fn get_sub(&self, sub_op: &Operator) -> Option<i32> {
-        if let Some(i) = self.subs.get(sub_op) {
-            return Some(*i);
-        }
-        None
-    }
-
-    pub fn get_mul(&self, mul_op: &Operator) -> Option<i32> {
-        if let Some(i) = self.muls.get(mul_op) {
-            return Some(*i);
-        }
-        None
-    }
-
-    pub fn get_div(&self, div_op: &Operator) -> Option<i32> {
-        if let Some(i) = self.muls.get(div_op) {
-            return Some(*i);
-        }
-        None
     }
 
     pub fn get_inst_num(&self, op: &Operator) -> Option<i32> {
@@ -194,9 +144,5 @@ impl InstStorage {
             _ => (),
         }
         None
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.adds.is_empty() && self.subs.is_empty() && self.muls.is_empty() && self.divs.is_empty()
     }
 }

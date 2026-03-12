@@ -85,10 +85,6 @@ impl<'a> Block {
         self.table.clone()
     }
 
-    pub fn is_empty_storage(&self) -> bool {
-        self.inst_storage.is_empty()
-    }
-
     pub fn update_storage(&mut self) {
         for inst in self.insts.clone() {
             let inst_num = inst.clone().get_inst_num();
@@ -133,7 +129,6 @@ impl<'a> Block {
     /// update the ident's information in the table
     pub fn update_table(&mut self, ident: String, inst_num: i32) {
         self.table.insert(ident, Some(inst_num));
-        println!("\n\n\nTABLE: {:?}", self.table);
     }
 
     pub fn update_table_with_insts(&mut self, var_to_phi: &HashMap<String, i32>) {
@@ -157,10 +152,6 @@ impl<'a> Block {
         for (var, inst_n) in self.table.clone() {
             match (other.borrow().check_table(&var), inst_n) {
                 (Some(now_i), Some(other_i)) => {
-                    println!(
-                        "Variable: {}, my inst: {}, other inst: {}",
-                        var, now_i, other_i
-                    );
                     if now_i != other_i {
                         updated_vars.insert(var, (now_i, other_i));
                     }
@@ -189,16 +180,10 @@ impl<'a> Block {
 
     // var_to_pairs: var: (old, new)
     pub fn update_inst(&mut self, var_to_pairs: &HashMap<String, (i32, i32)>) {
-        println!("Current Table for update Inst: {}", self.block_name);
-        println!("Current ori_to_new: {:?}", var_to_pairs);
-        println!("Current table: {:?}", self.table);
-        println!("Current Insts: {:?}", self.insts);
         for i in 0..self.insts.len() {
-            println!("Current i for update Inst: {}", i);
             let mut inst = self.insts[i].clone();
             // case 1 to check two
             if let (Some(a), Some(b)) = &inst.clone().get_identifiers() {
-                println!("\n\n\n ID1: {}, ID2: {}", a, b);
                 let a_key = match var_to_pairs.get(a) {
                     Some(a_pair) => {
                         if inst.clone().is_op1(&a_pair.0) {
@@ -228,7 +213,6 @@ impl<'a> Block {
                     inst.update_op_inst2(k2);
                 }
             } else if let Some(a) = &inst.clone().get_id1() {
-                println!("\n\n\nID: {}", a);
                 let new_a = match var_to_pairs.get(a) {
                     Some(a_pair) => {
                         if inst.clone().is_op1(&a_pair.0) {
@@ -281,14 +265,6 @@ impl<'a> Block {
     }
 
     pub fn optimize_block(&mut self) {
-        // variable table update
-        // instruction update
-        // remove instruction
-        println!(
-            "\n\nInsts Before Opt: {:?} for this Block: {}\n\n\n",
-            self.insts, self.block_name
-        );
-
         let mut delete_insts = HashMap::new();
 
         let mut insts: VecDeque<Inst> = VecDeque::new();
@@ -347,8 +323,4 @@ impl<'a> Block {
             }
         }
     }
-
-    // pub fn fill_in_table(&mut self, ident: Ident, inst_num: i32) {
-    //     self.table.insert(ident, inst_num);
-    // }
 }

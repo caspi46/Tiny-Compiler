@@ -134,7 +134,7 @@ impl fmt::Display for Ident {
             Ident::InputNum => write!(f, "InputNum"),
             Ident::OutputNum => write!(f, "OutputNum"),
             Ident::OutputNewLine => write!(f, "OutputNewLine"),
-            Ident::UserDefined(s) => write!(f, "UserDfined {}", s),
+            Ident::UserDefined(s) => write!(f, "UserDefined {}", s),
         }
     }
 }
