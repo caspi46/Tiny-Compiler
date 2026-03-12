@@ -27,7 +27,11 @@ impl<'a> Inst {
 
     pub fn get_op_one(self) -> Option<i32> {
         match self.op {
-            Operator::SetPar1(a) | Operator::SetPar2(a) | Operator::SetPar3(a) => Some(a),
+            Operator::SetPar1(a)
+            | Operator::SetPar2(a)
+            | Operator::SetPar3(a)
+            | Operator::Ret(Some(a))
+            | Operator::Write(a) => Some(a),
             _ => None,
         }
     }
@@ -64,7 +68,9 @@ impl<'a> Inst {
             | Operator::Phi(a, _)
             | Operator::SetPar1(a)
             | Operator::SetPar2(a)
-            | Operator::SetPar3(a) => a == *other_a,
+            | Operator::SetPar3(a)
+            | Operator::Ret(Some(a))
+            | Operator::Write(a) => a == *other_a,
             _ => false,
         }
     }
@@ -81,18 +87,18 @@ impl<'a> Inst {
         }
     }
 
-    pub fn update_op_one(&mut self, updated_a: i32) {
-        let updated_op = match self.op {
-            Operator::SetPar1(_) => Some(Operator::SetPar1(updated_a)),
-            Operator::SetPar2(_) => Some(Operator::SetPar2(updated_a)),
-            Operator::SetPar3(_) => Some(Operator::SetPar3(updated_a)),
-            Operator::Ret(_) => Some(Operator::Ret(Some(updated_a))),
-            _ => None,
-        };
-        if let Some(op) = updated_op {
-            self.op = op;
-        }
-    }
+    // pub fn update_op_one(&mut self, updated_a: i32) {
+    //     let updated_op = match self.op {
+    //         Operator::SetPar1(_) => Some(Operator::SetPar1(updated_a)),
+    //         Operator::SetPar2(_) => Some(Operator::SetPar2(updated_a)),
+    //         Operator::SetPar3(_) => Some(Operator::SetPar3(updated_a)),
+    //         Operator::Ret(_) => Some(Operator::Ret(Some(updated_a))),
+    //         _ => None,
+    //     };
+    //     if let Some(op) = updated_op {
+    //         self.op = op;
+    //     }
+    // }
 
     pub fn update_op_two(&mut self, updated_a: i32, updated_b: i32) {
         let updated_op = match self.op {
@@ -119,9 +125,16 @@ impl<'a> Inst {
             Operator::Div(_, b) => Some(Operator::Div(updated_a, b)),
             Operator::Cmp(_, b) => Some(Operator::Cmp(updated_a, b)),
             Operator::Phi(_, b) => Some(Operator::Phi(updated_a, b)),
+            Operator::SetPar1(_) => Some(Operator::SetPar1(updated_a)),
+            Operator::SetPar2(_) => Some(Operator::SetPar2(updated_a)),
+            Operator::SetPar3(_) => Some(Operator::SetPar3(updated_a)),
+            Operator::Ret(_) => Some(Operator::Ret(Some(updated_a))),
+            Operator::Write(_) => Some(Operator::Write(updated_a)),
             _ => None,
         };
+
         if let Some(op) = updated_op {
+            println!("UPDATED OP: {}", op);
             self.op = op;
         }
     }

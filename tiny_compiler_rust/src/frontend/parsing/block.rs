@@ -225,7 +225,6 @@ impl<'a> Block {
                 };
                 if let Some(a) = new_a {
                     inst.update_op_inst1(a);
-                    inst.update_op_one(a);
                 }
             } else if let Some(b) = &inst.clone().get_id2() {
                 let new_b = match var_to_pairs.get(b) {
@@ -276,8 +275,7 @@ impl<'a> Block {
                 Operator::Add(_, _)
                 | Operator::Sub(_, _)
                 | Operator::Mul(_, _)
-                | Operator::Div(_, _)
-                | Operator::Phi(_, _) => {
+                | Operator::Div(_, _) => {
                     if let Some(opt_i) = self.inst_storage.get_inst_num(&check_op) {
                         if opt_i != check_i {
                             delete_insts.insert(check_i, opt_i);
@@ -291,6 +289,7 @@ impl<'a> Block {
                 }
             }
         }
+        let mut opt_inst = VecDeque::new();
         for mut inst in insts.clone() {
             match inst.clone().get_op_two() {
                 (Some(x), Some(y)) => {
@@ -300,6 +299,7 @@ impl<'a> Block {
                     if let Some(v) = delete_insts.get(&y) {
                         inst.update_op_inst2(*v);
                     }
+                    opt_inst.push_back(inst);
                     continue;
                 }
                 _ => (),
@@ -307,18 +307,26 @@ impl<'a> Block {
 
             match inst.clone().get_op_one() {
                 Some(x) => {
+                    println!(
+                        "\n\n<<<DETECTED INST>>> : {} \t {}",
+                        x,
+                        inst.clone().get_operator()
+                    );
                     if let Some(v) = delete_insts.get(&x) {
+                        println!("<<ENTERED>> : {} \t {}", v, inst.clone().get_operator());
                         inst.update_op_inst1(*v);
                     }
                 }
                 _ => (),
             }
+            opt_inst.push_back(inst);
         }
-        self.insts = insts;
+        self.insts = opt_inst;
         for (var, i) in self.table.clone() {
             if let Some(inst) = i
                 && let Some(opt_i) = delete_insts.get(&inst)
             {
+                println!("VAR: {}, INST_NUM: {}", var, opt_i);
                 self.table.insert(var, Some(*opt_i));
             }
         }

@@ -48,6 +48,7 @@ pub struct Parser {
     cur_block_num: usize,
     block0_num: usize,
     block0s: Vec<usize>,
+    final_block_key: usize,
     total_inst: i32,
     total_block: usize,
 }
@@ -80,6 +81,7 @@ impl Parser {
             total_inst: 0,
             total_block: 0,
             block0_num: 0, // block0 will be added to front at the end
+            final_block_key: 0,
             block0s,
         }
     }
@@ -493,7 +495,7 @@ impl Parser {
             self.connect(self.cur_block_num, fi_key);
 
             // phi function check
-            phis = self.update_phi(phis, self.cur_block_num);
+            phis = self.add_extra_phi(phis, self.cur_block_num, if_key);
 
             self.switch_block(else_key);
             let mut loc_rhs = (cond, "".to_string());
@@ -858,7 +860,7 @@ impl Parser {
     fn computation(&mut self) {
         // Main
         if self.current() != &Token::Main {
-            panic!("Error: Missing Main keyword");
+            panic!("Error: Missing Main keyword: {}", self.current());
         }
         self.move_token();
 
@@ -899,6 +901,7 @@ impl Parser {
         }
         self.add_inst_to_tail(Operator::End, (None, None));
         self.connect(0, main_key);
+        self.final_block_key = self.cur_block_num;
         self.set_positive();
         self.add_to_storage();
         self.optimize();
@@ -999,7 +1002,11 @@ impl Parser {
     ///
     /// print vars (variable containers)
     fn show_vars(&self) {
-        println!("Vars: {:?}", self.vars);
+        println!("\n\n\nVars: {:?}", self.vars);
+    }
+
+    fn show_tokens(&self) {
+        println!("\n\n\nTokens: {:?}", self.tokens);
     }
 
     /// show_insts
@@ -1008,7 +1015,7 @@ impl Parser {
     ///
     /// Used to see all the instructions in the main function at the end
     fn show_insts(&self) {
-        println!("Insts: {:?}", self.insts);
+        println!("\n\n\n<<CONST INSTS>>: {:?}", self.insts);
     }
 
     /// show_blocks
@@ -1018,8 +1025,8 @@ impl Parser {
     /// Used to see all the blocks at the end (main + user-defined functions)
     fn show_blocks(&self) {
         // println!("Block0: ");
-        println!("Block#: {}", self.blocks.len());
-        println!("Blocks:");
+        println!("\n\n\n<<BLOCK#>>: {}", self.blocks.len());
+        println!("<<BLOCK>>:");
         for i in 0..self.blocks.len() {
             if let Some(b) = self.blocks.get(&i) {
                 println!("{:?}", b.borrow());
@@ -1108,6 +1115,34 @@ impl Parser {
                 if let Some(Some(i)) = b_table.get(&var) {
                     let new_insts = (insts.0, *i);
                     phis.insert(var, new_insts);
+                }
+            }
+        }
+        phis
+    }
+
+    fn add_extra_phi(
+        &mut self,
+        mut phis: HashMap<String, (i32, i32)>,
+        now_key: usize,
+        pre_key: usize,
+    ) -> HashMap<String, (i32, i32)> {
+        if let (Some(now_b), Some(pre_b)) = (self.blocks.get(&now_key), self.blocks.get(&pre_key)) {
+            let now_table = now_b.borrow().get_table();
+            for (var, inst) in now_table.clone() {
+                if let Some(y) = inst {
+                    if let Some((x, _)) = phis.get(&var) {
+                        let new_insts = (*x, y);
+                        phis.insert(var, new_insts);
+                    } else {
+                        let pre_table = pre_b.borrow().get_table();
+                        if let Some(Some(x)) = pre_table.get(&var) {
+                            let new_insts = (*x, y);
+                            phis.insert(var, new_insts);
+                        } else {
+                            phis.insert(var, (0, y));
+                        }
+                    }
                 }
             }
         }
@@ -1230,6 +1265,9 @@ impl Parser {
                 bb.borrow_mut().optimize_block();
             }
         }
+        if let Some(final_block) = self.blocks.get(&self.final_block_key) {
+            self.vars = final_block.borrow().get_table();
+        }
     }
 
     /// get_bb0
@@ -1248,7 +1286,8 @@ impl Parser {
     ///
     /// visualize IR for a graph visualizer
     fn visualize_ir(&self) {
-        println!("digraph G {{");
+        println!("\n\n<<VISUALIZAITON>>");
+        println!("\n\n\ndigraph G {{");
         for i in 0..self.total_block + 1 {
             if let Some(bb) = self.blocks.get(&i) {
                 print!(
@@ -1340,6 +1379,7 @@ mod tests {
         );
         // 1 + 1 = a + 1 = b + 1 before a <- 2;
         let mut parse = Parser::new(input);
+        parse.show_tokens();
         parse.computation();
         parse.show_vars();
         parse.show_insts();
@@ -1518,6 +1558,27 @@ fi
         parse.show_blocks();
         parse.visualize_ir();
     }
+
+    #[test]
+    fn only_else_update_test() {
+        let input = String::from(
+            "main
+        var a, b; {
+        let a <- 2;
+            if 1 == 0 then
+            else let a <- b + 1;
+            
+
+fi
+    }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
     // bug found for table update for if statement phis
     #[test]
     fn if_statement_test2() {
@@ -1525,7 +1586,7 @@ fi
             "main
         var a; {
         let a <- 1;
-            if 1 > 2 then
+            if a > 2 then
     let a <- a - 1;
     else
     let a <- a + 3;
@@ -1779,12 +1840,13 @@ fi;
     fn while_if_test1() {
         let input = String::from(
             "main
-        var a; {
+        var a,b ; {
         let a <- 1;
         while 1 == 2 do
             if 1 == a then
                 let a <- a - 1;
             else let a <- a + 3;
+                let b <- b + 2;
             fi;
         od;
         let a <- a + 1;
@@ -2342,20 +2404,30 @@ var x, y,i,j; {
     fn test_from_testcases() {
         let input = String::from(
             "main
-var var1, var2, var3, var4;
+var x, y, z;
 {
-let var1 <- call InputNum;
-let var2 <- call InputNum;
-let var3 <- call InputNum;
-let var4 <- call InputNum;
-
-call OutputNum ( (var1 + var2 * (var4 / var1)) / ((var1 - var2) + ((var1)) - var2 / var3 * var3) / 6 + var1 * (1 + 3) ); 
-}
-.
+    let x <- 1;
+    let y <- 2;
+    let z <- 0;
+    while x < 5 do
+        if y > 1 then
+            let x <- x + 1;
+            let z <- z + 1;
+        else
+            let y <- y + 1;
+        fi;
+        let x <- x + 1;
+    od;
+    call OutputNum(x);
+    call OutputNum(y);
+    call OutputNum(z);
+    
+}.
 ",
         );
         let mut parse = Parser::new(input);
         parse.computation();
+        parse.show_tokens();
         parse.show_vars();
         parse.show_insts();
         parse.show_blocks();

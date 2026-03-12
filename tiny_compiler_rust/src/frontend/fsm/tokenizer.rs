@@ -220,7 +220,7 @@ impl Tokenizer {
 
     pub fn generate_token(&mut self) {
         let mut cur_token = match self.input[0] {
-            ' ' => String::new(),
+            ' ' | '\t' | '\n' => String::new(),
             n => String::from(n),
         };
         let mut i = 1;
@@ -305,5 +305,18 @@ mod tests {
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
         tokenizer.get_tokens();
+    }
+
+    #[test]
+    fn main_error() {
+        let input = String::from(
+            "
+main
+var var1, var2, var3, var4, var5;
+{",
+        );
+        let mut tokenizer = Tokenizer::new(input);
+        tokenizer.generate_token();
+        println!("Tokens: {:?}", tokenizer.get_tokens());
     }
 }

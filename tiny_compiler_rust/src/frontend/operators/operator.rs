@@ -69,7 +69,7 @@ impl fmt::Display for Operator {
             Operator::WriteNL => write!(f, "writeNL"),
 
             Operator::Jsr(b) => write!(f, "jsr {}", b),
-            Operator::Ret(Some(x)) => write!(f, "ret {}", x),
+            Operator::Ret(Some(x)) => write!(f, "ret ({})", x),
             Operator::Ret(None) => write!(f, "ret"),
 
             Operator::GetPar1 => write!(f, "getPar1"),
