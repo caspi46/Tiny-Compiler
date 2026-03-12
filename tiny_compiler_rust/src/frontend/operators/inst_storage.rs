@@ -18,6 +18,7 @@ pub struct InstStorage {
     subs: HashMap<Operator, i32>,
     muls: HashMap<Operator, i32>,
     divs: HashMap<Operator, i32>,
+    // all_insts: HashMap<Operator, i32>,
 }
 
 impl InstStorage {
@@ -27,6 +28,7 @@ impl InstStorage {
             subs: HashMap::new(),
             muls: HashMap::new(),
             divs: HashMap::new(),
+            // all_insts: HashMap::new(),
         }
     }
 
@@ -64,11 +66,12 @@ impl InstStorage {
             },
             _ => panic!("Error: Failed to check add operator in storage"),
         };
-        if !self.muls.contains_key(&new_abs_add) {
-            self.muls.insert(new_abs_add, inst_num);
+        if !self.adds.contains_key(&new_abs_add) {
+            self.adds.insert(new_abs_add.clone(), inst_num);
+            // self.all_insts.insert(new_abs_add, inst_num);
             return Some(inst_num);
         }
-        match self.muls.get(&new_abs_add) {
+        match self.adds.get(&new_abs_add) {
             Some(&i) => Some(i),
             _ => panic!("Error: Failed to add new mul operator in storage"),
         }
@@ -82,7 +85,8 @@ impl InstStorage {
             }
         };
         if !self.subs.contains_key(&new_abs_sub) {
-            self.subs.insert(new_abs_sub, inst_num);
+            self.subs.insert(new_abs_sub.clone(), inst_num);
+            // self.all_insts.insert(new_abs_sub, inst_num);
             return Some(inst_num);
         }
         match self.subs.get(&new_abs_sub) {
@@ -99,7 +103,8 @@ impl InstStorage {
             }
         };
         if !self.divs.contains_key(&new_abs_div) {
-            self.divs.insert(new_abs_div, inst_num);
+            self.divs.insert(new_abs_div.clone(), inst_num);
+            // self.all_insts.insert(new_abs_div, inst_num);
             return Some(inst_num);
         }
         match self.divs.get(&new_abs_div) {
@@ -125,7 +130,8 @@ impl InstStorage {
             _ => panic!("Error: Failed to check add operator in storage"),
         };
         if !self.muls.contains_key(&new_abs_mul) {
-            self.muls.insert(new_abs_mul, inst_num);
+            self.muls.insert(new_abs_mul.clone(), inst_num);
+            // self.all_insts.insert(new_abs_mul, inst_num);
             return Some(inst_num);
         }
         match self.muls.get(&new_abs_mul) {
@@ -188,5 +194,9 @@ impl InstStorage {
             _ => (),
         }
         None
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.adds.is_empty() && self.subs.is_empty() && self.muls.is_empty() && self.divs.is_empty()
     }
 }

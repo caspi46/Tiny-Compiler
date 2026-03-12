@@ -165,13 +165,16 @@ impl Parser {
             // variable
             Token::Ident(UserDefined(var)) => {
                 self.move_token();
-                let cur_block = if let Some(b) = self.blocks.get(&self.total_block) {
+                let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
                     b
                 } else {
                     panic!("Error: No Block Found at {}", self.total_block)
                 };
 
                 if let Some(inst_num) = cur_block.borrow().check_table(&var) {
+                    println!("\n\n\nCURRENT TABLE: {:?}", cur_block.borrow().get_table());
+                    println!("\n\n\nVARIALBE:{}\tINST_NUM:{}", var, inst_num);
+                    println!("\n\n\nCURRENT B KEY: {}", self.cur_block_num);
                     (inst_num, Some(var))
                 } else {
                     println!("Warning: Uninitialized variable");
@@ -475,7 +478,6 @@ impl Parser {
         self.switch_block(then_key);
         self.stat_sequence();
         // add branch call instruction
-        let end_then_key = self.total_block;
         self.connect(if_key, then_key);
 
         // generate phis for then
@@ -501,7 +503,7 @@ impl Parser {
             println!("block num after else: {}", self.cur_block_num);
             phis = self.update_phi(phis, self.cur_block_num);
             println!(
-                "\n\n\nAFTER TABLE at UPDATE PHI: {:?}\n\n\n",
+                "\n\n\nAFTER phi TABLE at UPDATE PHI: {:?}\n\n\n",
                 self.get_table_from_block(self.cur_block_num)
             );
 
@@ -536,6 +538,7 @@ impl Parser {
             let inst_num = self.add_inst_to_tail(phi_op, (Some(var.clone()), Some(var.clone())));
             self.update_table(var, inst_num);
         }
+
         self.move_token();
     }
 
@@ -992,16 +995,18 @@ impl Parser {
     fn add_to_storage(&mut self) {
         // self.inst_storage.add_muls(op.clone(), return_val);
         // self.inst_storage.add_divs(op.clone(), return_val);
-        for i in 1..self.total_block {
+        for i in 1..self.total_block + 1 {
             if !self.block0s.contains(&i)
                 && let Some(bb) = self.blocks.get(&i)
             {
-                let insts = bb.borrow().get_insts();
-                for inst in insts.clone() {
-                    let inst_num = inst.clone().get_inst_num();
-                    let op = inst.get_operator();
-
-                    self.inst_storage.adds(op, inst_num);
+                bb.borrow_mut().update_storage();
+                let doms = bb.borrow().get_doms().clone();
+                for dom in doms {
+                    if let Some(dom_block) = self.blocks.get(&dom) {
+                        dom_block
+                            .borrow_mut()
+                            .update_storage_with(bb.borrow().get_inst_storage());
+                    }
                 }
             }
         }
@@ -1298,7 +1303,7 @@ impl Parser {
             if !self.block0s.contains(&i)
                 && let Some(bb) = self.blocks.get(&i)
             {
-                bb.borrow_mut().optimize_block(&self.inst_storage);
+                bb.borrow_mut().optimize_block();
             }
         }
     }
@@ -1392,8 +1397,8 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::error::Error;
-    use std::fs;
+    // use std::error::Error;
+    // use std::fs;
 
     #[test]
     fn copy_propa_test1() {
@@ -1602,7 +1607,7 @@ fi
     let a <- a + 3;
     let a <- a - 2;
 fi; 
-    let a <- a + 3;
+    let b <- a + 3;
     }.",
         );
         let mut parse = Parser::new(input);
@@ -1645,8 +1650,8 @@ fi;
             "main
         var a; {
         let a <- 1;
+        let a <- a - 1;
             if 1 == 2 then
-                let a <- a + 1;
                 if 1 == 2 then
                     let a <- a - 1;
                 else 

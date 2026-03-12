@@ -66,19 +66,6 @@ impl<'a> Block {
         self.doms.push(block_num);
     }
 
-    /// get_head
-    /// get the first inst of the block
-    pub fn get_head(&self) -> &Inst {
-        &self.insts[0]
-    }
-
-    pub fn get_head_num(&self) -> Option<i32> {
-        if self.insts.len() == 0 {
-            return None;
-        }
-        Some(self.insts[0].clone().get_inst_num())
-    }
-
     pub fn get_inst_num_index(&self, inst_num: i32) -> Option<usize> {
         for i in 0..self.insts.len() {
             if self.insts[i].clone().get_inst_num() == inst_num {
@@ -86,12 +73,6 @@ impl<'a> Block {
             }
         }
         return None;
-    }
-
-    /// get_tail
-    /// get the last inst of the block
-    pub fn get_tail(&self) -> &Inst {
-        &self.insts[self.insts.len()]
     }
 
     pub fn get_tail_op(&self) -> Operator {
@@ -103,6 +84,27 @@ impl<'a> Block {
     pub fn get_table(&self) -> HashMap<String, Option<i32>> {
         self.table.clone()
     }
+
+    pub fn is_empty_storage(&self) -> bool {
+        self.inst_storage.is_empty()
+    }
+
+    pub fn update_storage(&mut self) {
+        for inst in self.insts.clone() {
+            let inst_num = inst.clone().get_inst_num();
+            let op = inst.get_operator();
+            self.inst_storage.adds(op, inst_num);
+        }
+    }
+
+    pub fn update_storage_with(&mut self, upon_storage: InstStorage) {
+        self.inst_storage = upon_storage;
+    }
+
+    pub fn get_inst_storage(&self) -> InstStorage {
+        self.inst_storage.clone()
+    }
+
     /// push_head
     /// add inst to the front of the block
     pub fn push_head(&mut self, new_head: Inst) {
@@ -113,12 +115,6 @@ impl<'a> Block {
     /// add inst to the end of the block
     pub fn push_tail(&mut self, new_tail: Inst) {
         self.insts.push_back(new_tail);
-    }
-
-    /// get_inst_num
-    /// get the total number of inst in the block
-    pub fn get_inst_num(&self) -> i32 {
-        self.insts.len() as i32
     }
 
     pub fn get_insts(&self) -> VecDeque<Inst> {
@@ -133,21 +129,11 @@ impl<'a> Block {
         &self.doms
     }
 
-    /// contains_inst
-    /// check if the inst is in the block
-    pub fn contains_inst(&self, inst: Inst) -> bool {
-        for i in self.insts.clone() {
-            if i == inst {
-                return true;
-            }
-        }
-        false
-    }
-
     /// update_table
     /// update the ident's information in the table
     pub fn update_table(&mut self, ident: String, inst_num: i32) {
         self.table.insert(ident, Some(inst_num));
+        println!("\n\n\nTABLE: {:?}", self.table);
     }
 
     pub fn update_table_with_insts(&mut self, var_to_phi: &HashMap<String, i32>) {
@@ -191,10 +177,6 @@ impl<'a> Block {
         updated_vars
     }
 
-    pub fn get_block_num(&self) -> usize {
-        self.block_num
-    }
-
     pub fn get_inst(&self, op: &Operator) -> Option<i32> {
         for inst in &self.insts {
             let (n, o) = inst.clone().get_data();
@@ -203,19 +185,6 @@ impl<'a> Block {
             }
         }
         return None;
-    }
-
-    pub fn set_pair_for_phi(&mut self, phis: &Vec<(String, i32)>) -> HashMap<i32, i32> {
-        let mut pair = HashMap::new();
-        for (v, n) in phis {
-            if let Some(k) = self.table.get(v) {
-                if let Some(original) = k {
-                    pair.insert(*original, *n);
-                    self.table.insert(v.clone(), Some(*n));
-                }
-            }
-        }
-        pair
     }
 
     // var_to_pairs: var: (old, new)
@@ -311,7 +280,7 @@ impl<'a> Block {
         self.insts = insts.clone();
     }
 
-    pub fn optimize_block(&mut self, inst_storage: &InstStorage) {
+    pub fn optimize_block(&mut self) {
         // variable table update
         // instruction update
         // remove instruction
@@ -333,7 +302,7 @@ impl<'a> Block {
                 | Operator::Mul(_, _)
                 | Operator::Div(_, _)
                 | Operator::Phi(_, _) => {
-                    if let Some(opt_i) = inst_storage.get_inst_num(&check_op) {
+                    if let Some(opt_i) = self.inst_storage.get_inst_num(&check_op) {
                         if opt_i != check_i {
                             delete_insts.insert(check_i, opt_i);
                             continue;
