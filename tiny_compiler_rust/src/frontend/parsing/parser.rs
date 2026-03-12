@@ -1258,11 +1258,24 @@ impl Parser {
     }
 
     fn optimize(&mut self) {
+        let mut table_collector = HashMap::new();
         for i in 0..self.total_block + 1 {
             if !self.block0s.contains(&i)
                 && let Some(bb) = self.blocks.get(&i)
             {
-                bb.borrow_mut().optimize_block();
+                table_collector.insert(i, bb.borrow_mut().optimize_block());
+            }
+        }
+        for i in 0..self.total_block + 1 {
+            if !self.block0s.contains(&i)
+                && let Some(t) = table_collector.get(&i)
+                && let Some(bb) = self.blocks.get(&i)
+            {
+                for next in bb.borrow().get_nexts() {
+                    if let Some(next_bb) = self.blocks.get(next) {
+                        next_bb.borrow_mut().optimize_fully(t);
+                    }
+                }
             }
         }
         if let Some(final_block) = self.blocks.get(&self.final_block_key) {
@@ -2412,16 +2425,20 @@ let legalegends <- 2;
 
 if 1 < 2 then
     let zoink67 <- 1 + 1 + 1 + 1;
+    if 1 < 2 then
+        let zoink67 <- 0 + 0;
+    else
+        let zoink67 <- 1 + 1;
+    fi;
 else
-let x <- 1;
-    let zoink67 <- 67 + 67;
+let zotnk67 <- 2 + 2 + 1 + 1;
+    if 67 < 67 then
+        let zoink67 <- 2 + 2;
+    else
+        let zoink67 <- 3 + 3;
+    fi;
+    let zoink67 <- 5 + 5;
 fi;
-
-if 1 == 2 then
-    let zoink67 <- 1 - 1;
-fi;
-
-let zoink67 <- 67;
 
 }
 .

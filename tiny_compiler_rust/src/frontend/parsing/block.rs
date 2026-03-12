@@ -30,6 +30,7 @@ pub struct Block {
     inst_storage: InstStorage,
     nexts: Vec<usize>,
     doms: Vec<usize>,
+    opt_done: bool,
 }
 
 impl<'a> Block {
@@ -45,6 +46,7 @@ impl<'a> Block {
             nexts: Vec::new(),
             inst_storage: InstStorage::new(),
             doms: Vec::new(),
+            opt_done: false,
         }
     }
 
@@ -263,9 +265,12 @@ impl<'a> Block {
         self.insts = insts.clone();
     }
 
-    pub fn optimize_block(&mut self) {
+    pub fn optimize_block(&mut self) -> HashMap<(i32, String), Option<i32>> {
+        if self.opt_done {
+            return HashMap::new();
+        }
         let mut delete_insts = HashMap::new();
-
+        let mut table_collector = HashMap::new();
         let mut insts: VecDeque<Inst> = VecDeque::new();
         for inst in self.insts.clone() {
             let check = inst.clone();
@@ -290,6 +295,10 @@ impl<'a> Block {
             }
         }
         let mut opt_inst = VecDeque::new();
+        println!(
+            "BLOCK NAME: {}\tDETEL INSTS : {:?}",
+            self.block_name, delete_insts
+        );
         for mut inst in insts.clone() {
             match inst.clone().get_op_two() {
                 (Some(x), Some(y)) => {
@@ -299,6 +308,10 @@ impl<'a> Block {
                     if let Some(v) = delete_insts.get(&y) {
                         inst.update_op_inst2(*v);
                     }
+                    println!(
+                        "\n\nNEW INST AFTER UPDATE OP: {}",
+                        inst.clone().get_operator()
+                    );
                     opt_inst.push_back(inst);
                     continue;
                 }
@@ -325,6 +338,55 @@ impl<'a> Block {
         for (var, i) in self.table.clone() {
             if let Some(inst) = i
                 && let Some(opt_i) = delete_insts.get(&inst)
+            {
+                println!("VAR: {}, INST_NUM: {}", var, opt_i);
+                table_collector.insert((inst, var.clone()), Some(*opt_i));
+                self.table.insert(var, Some(*opt_i));
+            }
+        }
+        return table_collector;
+    }
+
+    // var_to_pairs: pairs => (old, new)
+    pub fn optimize_fully(&mut self, var_to_pairs: &HashMap<(i32, String), Option<i32>>) {
+        let mut opt_insts = VecDeque::new();
+        for mut inst in self.insts.clone() {
+            match inst.clone().get_op_two() {
+                (Some(x), Some(y)) => {
+                    if let Some(var_name) = inst.clone().get_id1()
+                        && let Some(Some(opt_one)) = var_to_pairs.get(&(x, var_name))
+                    {
+                        inst.update_op_inst1(*opt_one);
+                    }
+                    if let Some(var_name) = inst.clone().get_id2()
+                        && let Some(Some(opt_one)) = var_to_pairs.get(&(y, var_name))
+                    {
+                        inst.update_op_inst2(*opt_one);
+                    }
+                    opt_insts.push_back(inst.clone());
+                }
+                _ => (),
+            }
+            match inst.clone().get_op_one() {
+                Some(x) => {
+                    println!(
+                        "\n\n<<<DETECTED INST>>> : {} \t {}",
+                        x,
+                        inst.clone().get_operator()
+                    );
+                    if let Some(var_name) = inst.clone().get_id1()
+                        && let Some(Some(opt_one)) = var_to_pairs.get(&(x, var_name))
+                    {
+                        inst.update_op_inst1(*opt_one);
+                    }
+                }
+                _ => (),
+            }
+        }
+        self.insts = opt_insts;
+        for (var, i) in self.table.clone() {
+            if let Some(inst) = i
+                && let Some(Some(opt_i)) = var_to_pairs.get(&(inst, var.clone()))
             {
                 println!("VAR: {}, INST_NUM: {}", var, opt_i);
                 self.table.insert(var, Some(*opt_i));
