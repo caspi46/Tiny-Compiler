@@ -226,7 +226,7 @@ impl Parser {
             };
 
             return_val = self.add_inst_to_tail(op.clone(), (var1, var2));
-            self.inst_storage.adds_term(op, return_val);
+            // self.inst_storage.adds_term(op, return_val);
             var1 = None;
             x = return_val;
         }
@@ -253,7 +253,7 @@ impl Parser {
                 _ => panic!("Error: Invalid ADD or SUB format"),
             };
             return_val = self.add_inst_to_tail(op.clone(), (var1, var2));
-            self.inst_storage.adds_expression(op, return_val);
+            // self.inst_storage.adds_expression(op, return_val);
             var1 = None;
             // self.inst_storage.add_adds(op.clone(), return_val);
             // self.inst_storage.add_subs(op, return_val);
@@ -929,6 +929,8 @@ impl Parser {
         self.add_inst_to_tail(Operator::End, (None, None));
         self.connect(0, main_key);
         self.set_positive();
+        self.add_to_storage();
+        println!("\n\n\nSTORAGE: {:?}", self.inst_storage);
         self.optimize();
     }
 
@@ -987,10 +989,22 @@ impl Parser {
         self.total_inst
     }
 
-    fn add_inst_to_storage(&mut self) {
-
+    fn add_to_storage(&mut self) {
         // self.inst_storage.add_muls(op.clone(), return_val);
         // self.inst_storage.add_divs(op.clone(), return_val);
+        for i in 1..self.total_block {
+            if !self.block0s.contains(&i)
+                && let Some(bb) = self.blocks.get(&i)
+            {
+                let insts = bb.borrow().get_insts();
+                for inst in insts.clone() {
+                    let inst_num = inst.clone().get_inst_num();
+                    let op = inst.get_operator();
+
+                    self.inst_storage.adds(op, inst_num);
+                }
+            }
+        }
     }
 
     /// add_inst_to_head
@@ -1362,6 +1376,14 @@ impl Parser {
         }
         println!("}}");
     }
+
+    pub fn run(&mut self) {
+        self.computation();
+        self.show_vars();
+        self.show_insts();
+        self.show_blocks();
+        self.visualize_ir();
+    }
 }
 
 /// Tests:
@@ -1370,6 +1392,8 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::error::Error;
+    use std::fs;
 
     #[test]
     fn copy_propa_test1() {
@@ -1530,11 +1554,12 @@ mod tests {
     fn func_call_test() {
         let input = String::from(
             "main
-        var a; {
+        var a, b, c; {
             let a <- call InputNum();
+            let b <- 2 + 3;
             call OutputNewLine;
             call OutputNum(a);
-            call OutputNum(call InputNum);
+            call OutputNum((a + b) * (c - 2/a));
     }.",
         );
         let mut parse = Parser::new(input);
@@ -2376,6 +2401,30 @@ var x, y,i,j; {
     let i<-5;
     let x <-1-2*4+3/4;
 }.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn test_from_testcases() {
+        let input = String::from(
+            "main
+var var1, var2, var3, var4;
+{
+let var1 <- call InputNum;
+let var2 <- call InputNum;
+let var3 <- call InputNum;
+let var4 <- call InputNum;
+
+call OutputNum ( (var1 + var2 * (var4 / var1)) / ((var1 - var2) + ((var1)) - var2 / var3 * var3) / 6 + var1 * (1 + 3) ); 
+}
+.
+",
         );
         let mut parse = Parser::new(input);
         parse.computation();

@@ -191,7 +191,7 @@ impl Tokenizer {
             || ch == '>'
     }
     fn is_skippable(&self, ch: char) -> bool {
-        ch == ' ' || ch == '\n'
+        ch == ' ' || ch == '\n' || ch == '\t'
     }
 
     fn is_ch_num(&self, ch: char) -> bool {
