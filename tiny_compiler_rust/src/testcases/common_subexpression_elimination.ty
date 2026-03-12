@@ -10,4 +10,4 @@ return var2;
 return var1;
 return var2;
 return var1;
-}
+}.
