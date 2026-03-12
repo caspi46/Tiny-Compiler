@@ -6,28 +6,14 @@ use std::rc::Rc;
 pub struct Inst {
     inst_num: i32,
     op: Operator,
-    x: String, 
-    y: String
+    x: Option<String>,
+    y: Option<String>,
 }
 
 impl<'a> Inst {
-    pub fn new(inst_num: i32, op: Operator) -> Self {
-        Self {
-            inst_num,
-            op,
-            x: "Const".to_string(), 
-            y: "Const".to_string(),
-        }
+    pub fn new(inst_num: i32, op: Operator, x: Option<String>, y: Option<String>) -> Self {
+        Self { inst_num, op, x, y }
     }
-
-    // pub fn set_next(&mut self, next_inst: &Inst) {
-    //     let raw_ptr_nxt_inst = next_inst as *const Inst;
-    //     self.next = Some(raw_ptr_nxt_inst);
-    // }
-    // pub fn set_prev(&mut self, next_inst: &Inst) {
-    //     let raw_ptr_prev_inst = next_inst as *const Inst;
-    //     self.prev = Some(raw_ptr_prev_inst);
-    // }
 
     pub fn update_operator(&mut self, operator: Operator) {
         self.op = operator;
@@ -77,6 +63,31 @@ impl<'a> Inst {
         }
     }
 
+    pub fn is_var1(self, var: &str) -> bool {
+        if let Some(x) = self.x {
+            return x == var;
+        }
+        return false;
+    }
+
+    pub fn is_var2(self, var: &str) -> bool {
+        if let Some(y) = self.y {
+            return y == var;
+        }
+        return false;
+    }
+
+    pub fn get_identifiers(&self) -> (Option<String>, Option<String>) {
+        (self.x.clone(), self.y.clone())
+    }
+    pub fn get_id1(&self) -> Option<String> {
+        self.x.clone()
+    }
+
+    pub fn get_id2(&self) -> Option<String> {
+        self.y.clone()
+    }
+
     pub fn get_op_two(self) -> (Option<i32>, Option<i32>) {
         match self.op {
             Operator::Add(a, b)
@@ -86,6 +97,32 @@ impl<'a> Inst {
             | Operator::Cmp(a, b)
             | Operator::Phi(a, b) => (Some(a), Some(b)),
             _ => (None, None),
+        }
+    }
+    pub fn is_op1(self, other_a: &i32) -> bool {
+        match self.op {
+            Operator::Add(a, _)
+            | Operator::Sub(a, _)
+            | Operator::Mul(a, _)
+            | Operator::Div(a, _)
+            | Operator::Cmp(a, _)
+            | Operator::Phi(a, _)
+            | Operator::SetPar1(a)
+            | Operator::SetPar2(a)
+            | Operator::SetPar3(a) => a == *other_a,
+            _ => false,
+        }
+    }
+
+    pub fn is_op2(self, other_b: &i32) -> bool {
+        match self.op {
+            Operator::Add(_, b)
+            | Operator::Sub(_, b)
+            | Operator::Mul(_, b)
+            | Operator::Div(_, b)
+            | Operator::Cmp(_, b)
+            | Operator::Phi(_, b) => b == *other_b,
+            _ => false,
         }
     }
 

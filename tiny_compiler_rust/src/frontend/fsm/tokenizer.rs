@@ -236,11 +236,8 @@ impl Tokenizer {
             println!("current token: {}", cur_token);
             println!("current input element: {}", self.input[i]);
             let mut next = "".to_string();
-            if self.is_negative(cur_str, self.input[i]) {
-                println!("IS NEGATIVE");
+            if self.is_op(cur_str) {
                 next = self.input[i].to_string();
-                self.is_op(cur_str);
-                println!("Current Token:{}\nNext in is_neg:{}\n", cur_str, next);
             }
             // check the symbol
             else if !self.is_ch_symbol(self.input[i]) && self.is_symbol(cur_str) {
@@ -324,7 +321,7 @@ mod tests {
 
     #[test]
     fn negative_check() {
-        let input = String::from("1-1");
+        let input = String::from("1-2*3/4+5");
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
         tokenizer.get_tokens();

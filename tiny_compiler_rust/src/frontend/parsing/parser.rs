@@ -62,7 +62,7 @@ impl Parser {
         tokenizer.generate_token();
         let tokens = tokenizer.get_tokens();
         let block0 = RefCell::new(Block::new(0, "block".to_string(), HashMap::new()));
-        let zero_inst = Inst::new(0, Operator::Const(0));
+        let zero_inst = Inst::new(0, Operator::Const(0), None, None);
         block0.borrow_mut().push_head(zero_inst);
         let mut blocks = BTreeMap::new();
         blocks.insert(0, block0);
@@ -136,34 +136,31 @@ impl Parser {
     ///   
     ///     if so: check if it's a void or not. It must be non-void function
     ///            and move onto the function call (func_call)
-    fn factor(&mut self) -> i32 {
+    fn factor(&mut self) -> (i32, Option<String>) {
         self.move_token();
         println!("Factor's current Token: {}", self.current());
         let factor_token = self.current().clone();
         match factor_token {
             // ( )
             Token::Symbol(Symbol::OpenParen) => {
-                let inst_num = self.expression();
+                let (inst_num, var) = self.expression();
                 if self.current() != &Token::Symbol(Symbol::CloseParen) {
                     panic!("Error, missing closed parentheses: {}", self.current());
                 }
                 self.move_token();
-                return inst_num;
+                return (inst_num, var);
             }
             // number
             Token::Number(num) => {
                 let op = Operator::Const(num);
                 self.move_token();
                 if let Some(i_num) = self.get_bb0(&op) {
-                    if i_num == 0 {
-                        return -100;
-                    }
-                    return i_num * (-1);
+                    return (i_num * (-1), None);
                 }
 
                 let inst_num = self.add_const_to_bb0(op);
                 println!("Num's Token: {}", inst_num);
-                return inst_num * (-1);
+                return (inst_num * (-1), None);
             }
             // variable
             Token::Ident(UserDefined(var)) => {
@@ -175,10 +172,10 @@ impl Parser {
                 };
 
                 if let Some(inst_num) = cur_block.borrow().check_table(&var) {
-                    inst_num
+                    (inst_num, Some(var))
                 } else {
                     println!("Warning: Uninitialized variable");
-                    0
+                    (0, Some(var))
                 }
             }
             // function call
@@ -192,12 +189,12 @@ impl Parser {
                             panic!("Error: Void function detected in assignment");
                         }
                         let inst_num = self.func_call();
-                        return inst_num;
+                        return (inst_num, None);
                     }
                     // predefined function
                     Token::Ident(_) => {
                         let inst_num = self.func_call();
-                        return inst_num; // Should call funcCall 
+                        return (inst_num, None); // Should call funcCall 
                     }
                     _ => panic!("Error: Invalid Function Call"),
                 }
@@ -211,55 +208,57 @@ impl Parser {
     /// term:
     ///
     /// factor { ("*" | "/") factor }
-    fn term(&mut self) -> i32 {
-        let mut x: i32 = self.factor();
+    fn term(&mut self) -> (i32, Option<String>) {
+        let (mut x, mut var1) = self.factor();
         println!("Current token after Factor: {}", self.current());
         if self.current() != &Token::Op(MUL) && self.current() != &Token::Op(DIV) {
-            return x;
+            return (x, var1);
         }
         let mut return_val = x;
         let mut calc;
         while self.current() == &Token::Op(MUL) || self.current() == &Token::Op(DIV) {
             calc = self.current().clone();
-            let y = self.factor();
+            let (y, var2) = self.factor();
             let op = match calc {
                 Token::Op(MUL) => Operator::Mul(x, y),
                 Token::Op(DIV) => Operator::Div(x, y),
                 _ => panic!("Error, Invalid Div or Mul"),
             };
-            return_val = self.add_inst_to_tail(op.clone());
 
+            return_val = self.add_inst_to_tail(op, (var1, var2));
+            var1 = None;
             x = return_val;
         }
-        return_val
+        (return_val, None)
     }
 
     /// expression:
     ///
     /// term { ("+" | "-") term }
-    fn expression(&mut self) -> i32 {
-        let mut x = self.term();
+    fn expression(&mut self) -> (i32, Option<String>) {
+        let (mut x, mut var1) = self.term();
         if self.current() != &Token::Op(ADD) && self.current() != &Token::Op(SUB) {
-            return x;
+            return (x, var1);
         }
         let mut calc;
         let mut return_val = x;
         while self.current() == &Token::Op(ADD) || self.current() == &Token::Op(SUB) {
             println!("Current Token at ADD&SUB loop: {}", self.current());
             calc = self.current().clone();
-            let y = self.term();
+            let (y, var2) = self.term();
             let op = match calc {
                 Token::Op(ADD) => Operator::Add(x, y),
                 Token::Op(SUB) => Operator::Sub(x, y),
                 _ => panic!("Error: Invalid ADD or SUB format"),
             };
-            return_val = self.add_inst_to_tail(op.clone());
-            self.inst_storage.add_adds(op.clone(), return_val);
-            self.inst_storage.add_subs(op, return_val);
+            return_val = self.add_inst_to_tail(op.clone(), (var1, var2));
+            var1 = None;
+            // self.inst_storage.add_adds(op.clone(), return_val);
+            // self.inst_storage.add_subs(op, return_val);
 
             x = return_val;
         }
-        return_val
+        (return_val, None)
     }
 
     /// relation:
@@ -267,18 +266,18 @@ impl Parser {
     /// expression relOp expression
     fn relation(&mut self) -> i32 {
         println!("Current Token in Relation: {}", self.current());
-        let lhs = self.expression();
+        let (lhs, lhs_var) = self.expression();
         print!("Current Token after LHS in relation: {}", self.current());
         let rel_op = self.current().clone();
-        let rhs = self.expression();
-        let cmp = self.add_inst_to_tail(Operator::Cmp(lhs, rhs));
+        let (rhs, rhs_var) = self.expression();
+        let cmp = self.add_inst_to_tail(Operator::Cmp(lhs, rhs), (lhs_var, rhs_var));
         let rel_inst = match rel_op {
-            Token::RelOp(EQ) => self.add_inst_to_tail(Operator::Bne(cmp, None)),
-            Token::RelOp(NE) => self.add_inst_to_tail(Operator::Beq(cmp, None)),
-            Token::RelOp(GT) => self.add_inst_to_tail(Operator::Ble(cmp, None)),
-            Token::RelOp(LT) => self.add_inst_to_tail(Operator::Bge(cmp, None)),
-            Token::RelOp(GE) => self.add_inst_to_tail(Operator::Blt(cmp, None)),
-            Token::RelOp(LE) => self.add_inst_to_tail(Operator::Bgt(cmp, None)),
+            Token::RelOp(EQ) => self.add_inst_to_tail(Operator::Bne(cmp, None), (None, None)),
+            Token::RelOp(NE) => self.add_inst_to_tail(Operator::Beq(cmp, None), (None, None)),
+            Token::RelOp(GT) => self.add_inst_to_tail(Operator::Ble(cmp, None), (None, None)),
+            Token::RelOp(LT) => self.add_inst_to_tail(Operator::Bge(cmp, None), (None, None)),
+            Token::RelOp(GE) => self.add_inst_to_tail(Operator::Blt(cmp, None), (None, None)),
+            Token::RelOp(LE) => self.add_inst_to_tail(Operator::Bgt(cmp, None), (None, None)),
             _ => {
                 panic!("Error, missing relOp: ==, !=, >, <, >=, <=");
             }
@@ -301,15 +300,9 @@ impl Parser {
             panic!("Error: Invalid Assignment Format, Missing \"<-\"");
         }
         println!("Current token before expression: {}", self.current());
-        let rhs = self.expression(); // TODO: Return value (Identify the value)
+        let (rhs, _) = self.expression(); // TODO: Return value (Identify the value)
 
-        let updated_rhs = if rhs > 0 {
-            rhs
-        } else if rhs == -100 {
-            0
-        } else {
-            rhs * (-1)
-        };
+        let updated_rhs = if rhs > 0 { rhs } else { rhs * (-1) };
         self.vars.insert(var.clone(), Some(updated_rhs));
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b
@@ -330,7 +323,7 @@ impl Parser {
                 let op = Operator::Read;
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) != self.current() {
-                    let _ = self.add_inst_to_tail(op.clone());
+                    let _ = self.add_inst_to_tail(op.clone(), (None, None));
                     return self.total_inst;
                 }
                 self.move_token();
@@ -338,7 +331,7 @@ impl Parser {
                     panic!("Error: no closed parenthesis");
                 }
 
-                let _ = self.add_inst_to_tail(op.clone());
+                let _ = self.add_inst_to_tail(op.clone(), (None, None));
                 self.move_token();
                 self.total_inst
             }
@@ -348,7 +341,7 @@ impl Parser {
                 let op = Operator::WriteNL;
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) != self.current() {
-                    let _ = self.add_inst_to_tail(op.clone());
+                    let _ = self.add_inst_to_tail(op.clone(), (None, None));
                     return self.total_inst;
                 }
                 self.move_token();
@@ -356,7 +349,7 @@ impl Parser {
                     panic!("Error: no closed parenthesis");
                 }
 
-                let inst_num = self.add_inst_to_tail(op.clone());
+                let inst_num = self.add_inst_to_tail(op.clone(), (None, None));
                 self.insts.insert(op, inst_num);
                 self.move_token();
                 self.total_inst
@@ -365,13 +358,13 @@ impl Parser {
             Token::Ident(Ident::OutputNum) => {
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) == self.current() {
-                    let arg = self.expression();
+                    let (arg, var) = self.expression();
                     if &Token::Symbol(Symbol::CloseParen) != self.current() {
                         panic!("Error: no closed parenthesis: {}", self.current());
                     }
 
                     let write_op = Operator::Write(arg);
-                    let inst_num = self.add_inst_to_tail(write_op.clone());
+                    let inst_num = self.add_inst_to_tail(write_op.clone(), (var, None));
                     self.insts.insert(write_op, inst_num);
                     self.move_token();
                     self.total_inst
@@ -396,17 +389,19 @@ impl Parser {
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) == self.current() {
                     if params >= 1 {
-                        let param1 = self.expression();
+                        let (param1, param1_var) = self.expression();
                         let set_param1 = Operator::SetPar1(param1);
-                        let inst_num = self.add_inst_to_tail(set_param1.clone());
+                        let inst_num =
+                            self.add_inst_to_tail(set_param1.clone(), (param1_var, None));
                         self.insts.insert(set_param1, inst_num);
                     }
 
                     if self.current() == &Token::Symbol(Symbol::Comma) {
                         if params >= 2 {
-                            let param2 = self.expression();
+                            let (param2, param2_var) = self.expression();
                             let set_param2 = Operator::SetPar2(param2);
-                            let inst_num = self.add_inst_to_tail(set_param2.clone());
+                            let inst_num =
+                                self.add_inst_to_tail(set_param2.clone(), (param2_var, None));
                             self.insts.insert(set_param2, inst_num);
                         } else {
                             panic!("Error: Parameter # mismatching");
@@ -414,9 +409,10 @@ impl Parser {
                     }
                     if self.current() == &Token::Symbol(Symbol::Comma) {
                         if params == 3 {
-                            let param3 = self.expression();
+                            let (param3, param3_var) = self.expression();
                             let set_param3 = Operator::SetPar3(param3);
-                            let inst_num = self.add_inst_to_tail(set_param3.clone());
+                            let inst_num =
+                                self.add_inst_to_tail(set_param3.clone(), (param3_var, None));
                             self.insts.insert(set_param3, inst_num);
                         } else {
                             panic!("Error: Parameter # mismatching");
@@ -433,13 +429,13 @@ impl Parser {
                             self.current()
                         );
                     }
-                    let inst_num = self.add_inst_to_tail(func_call.clone());
+                    let inst_num = self.add_inst_to_tail(func_call.clone(), (None, None));
                     self.insts.insert(func_call, inst_num);
                     self.move_token();
                     self.total_inst
                 } else {
                     if params == 0 {
-                        let inst_num = self.add_inst_to_tail(func_call.clone());
+                        let inst_num = self.add_inst_to_tail(func_call.clone(), (None, None));
                         self.insts.insert(func_call, inst_num);
                         return self.total_inst;
                     }
@@ -487,7 +483,7 @@ impl Parser {
 
         // else block check
         if self.current() == &Token::Else {
-            self.add_inst_to_tail(Operator::Bra(fi_block_name));
+            self.add_inst_to_tail(Operator::Bra(fi_block_name), (None, None));
 
             // since else is optional
             println!("BEFORE TABLE AT ELSE: {:?}\n\n\n\n", before_table);
@@ -535,7 +531,7 @@ impl Parser {
         self.switch_block(fi_key);
         for (var, phi) in phis {
             let phi_op = Operator::Phi(phi.0, phi.1);
-            let inst_num = self.add_inst_to_tail(phi_op);
+            let inst_num = self.add_inst_to_tail(phi_op, (Some(var.clone()), Some(var.clone())));
             self.update_table(var, inst_num);
         }
         self.move_token();
@@ -571,7 +567,7 @@ impl Parser {
         // do check
         self.switch_block(do_key);
         self.stat_sequence();
-        self.add_inst_to_tail(Operator::Bra(while_block_name));
+        self.add_inst_to_tail(Operator::Bra(while_block_name), (None, None));
 
         // generate phi function(s)
         let phis;
@@ -584,21 +580,21 @@ impl Parser {
         // format phi function information
         // add phi function instructions to while block
         self.switch_block(while_key);
-        let mut ori_to_new = HashMap::new();
+        let mut var_to_pairs = HashMap::new();
         let mut var_to_phi = HashMap::new();
         let mut phi_insts = Vec::new();
         for (var, phi) in phis {
             self.total_inst += 1;
             let phi_op = Operator::Phi(phi.0, phi.1);
             println!("phi_op: {}", phi_op);
-            let phi_inst = Inst::new(self.total_inst, phi_op);
-            ori_to_new.insert(phi.0, self.total_inst);
+            let phi_inst = Inst::new(self.total_inst, phi_op, Some(var.clone()), None);
+            var_to_pairs.insert(var.clone(), (phi.0, self.total_inst));
             var_to_phi.insert(var, self.total_inst);
             phi_insts.push(phi_inst);
         }
         // update instruction based on phi
-        self.update_by_phi(ori_to_new, while_key);
-        self.update_table_with_insts(var_to_phi, while_key);
+        self.update_by_phi(var_to_pairs, while_key);
+        self.update_tables_with_insts(var_to_phi, while_key);
         // add phi functions on while block
         for inst in phi_insts {
             let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
@@ -627,9 +623,9 @@ impl Parser {
     ///
     /// "return" [ expression ]
     fn return_statement(&mut self) {
-        let return_var = self.expression();
-        let return_op = Operator::Ret(Some(return_var));
-        self.add_inst_to_tail(return_op);
+        let (return_inst, return_var) = self.expression();
+        let return_op = Operator::Ret(Some(return_inst));
+        self.add_inst_to_tail(return_op, (return_var, None));
     }
 
     /// statement
@@ -765,7 +761,7 @@ impl Parser {
 
         // void check
         if is_void {
-            self.add_inst_to_tail(Operator::Ret(None));
+            self.add_inst_to_tail(Operator::Ret(None), (None, None));
             self.void_funcs.push(func_name);
         }
 
@@ -814,7 +810,7 @@ impl Parser {
                     op = Operator::GetPar1;
                     par = par1.to_string();
 
-                    let par1_inst = self.add_inst_to_tail(op);
+                    let par1_inst = self.add_inst_to_tail(op, (None, None));
                     self.update_table(par.to_string(), par1_inst);
                     println!("vars : {:?}", self.vars);
                     self.move_token();
@@ -830,7 +826,7 @@ impl Parser {
                         op = Operator::GetPar2;
                         par = par2.to_string();
 
-                        let par2_inst = self.add_inst_to_tail(op);
+                        let par2_inst = self.add_inst_to_tail(op, (None, None));
                         self.update_table(par.to_string(), par2_inst);
                         self.move_token();
                     }
@@ -846,7 +842,7 @@ impl Parser {
                         op = Operator::GetPar3;
                         par = par3.to_string();
 
-                        let par3_inst = self.add_inst_to_tail(op);
+                        let par3_inst = self.add_inst_to_tail(op, (None, None));
                         self.update_table(par.to_string(), par3_inst);
                         self.move_token();
                     }
@@ -928,7 +924,7 @@ impl Parser {
                 self.current()
             );
         }
-        self.add_inst_to_tail(Operator::End);
+        self.add_inst_to_tail(Operator::End, (None, None));
         self.connect(0, main_key);
         self.set_positive();
         self.optimize();
@@ -961,7 +957,7 @@ impl Parser {
     fn add_const_to_bb0(&mut self, op: Operator) -> i32 {
         self.total_inst += 1;
         let inst_num = self.total_inst;
-        let new_const = Inst::new(inst_num, op.clone());
+        let new_const = Inst::new(inst_num, op.clone(), None, None);
         let bb0 = if let Some(b) = self.blocks.get(&self.block0_num) {
             b
         } else {
@@ -977,9 +973,9 @@ impl Parser {
     /// op: Operator
     ///
     /// add new instruction to the current block (Tail)
-    fn add_inst_to_tail(&mut self, op: Operator) -> i32 {
+    fn add_inst_to_tail(&mut self, op: Operator, x_y: (Option<String>, Option<String>)) -> i32 {
         self.total_inst += 1;
-        let new_inst = Inst::new(self.total_inst, op);
+        let new_inst = Inst::new(self.total_inst, op, x_y.0, x_y.1);
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b
         } else {
@@ -991,8 +987,8 @@ impl Parser {
 
     fn add_inst_to_storage(&mut self) {
 
-            // self.inst_storage.add_muls(op.clone(), return_val);
-            // self.inst_storage.add_divs(op.clone(), return_val);
+        // self.inst_storage.add_muls(op.clone(), return_val);
+        // self.inst_storage.add_divs(op.clone(), return_val);
     }
 
     /// add_inst_to_head
@@ -1000,9 +996,9 @@ impl Parser {
     /// op: Operator
     ///
     /// add new instruction to the current block (Head)
-    fn add_inst_to_head(&mut self, op: Operator) -> i32 {
+    fn add_inst_to_head(&mut self, op: Operator, x_y: (Option<String>, Option<String>)) -> i32 {
         self.total_inst += 1;
-        let new_inst = Inst::new(self.total_inst, op);
+        let new_inst = Inst::new(self.total_inst, op, x_y.0, x_y.1);
         let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
             b
         } else {
@@ -1175,7 +1171,7 @@ impl Parser {
     /// start_key: usize
     ///
     /// update instructions based on phi function info
-    fn update_by_phi(&mut self, phis: HashMap<i32, i32>, start_key: usize) {
+    fn update_by_phi(&mut self, phis: HashMap<String, (i32, i32)>, start_key: usize) {
         println!("\nUPDATE_BY_PHI:\n");
         for i in start_key..self.total_block + 1 {
             if let Some(block) = self.blocks.get(&i) {
@@ -1208,11 +1204,15 @@ impl Parser {
     /// start_key: usize
     ///
     /// update table based on the phi function info
-    fn update_table_with_insts(&mut self, var_to_phi: HashMap<String, i32>, start_key: usize) {
+    fn update_tables_with_insts(&mut self, var_to_phi: HashMap<String, i32>, start_key: usize) {
         for i in start_key..self.total_block + 1 {
-            if let Some(block) = self.blocks.get(&i) {
-                block.borrow_mut().update_table_with_insts(&var_to_phi);
-            }
+            self.update_table_with_phi(&var_to_phi, i);
+        }
+    }
+
+    fn update_table_with_phi(&mut self, var_to_phi: &HashMap<String, i32>, key: usize) {
+        if let Some(block) = self.blocks.get(&key) {
+            block.borrow_mut().update_table_with_insts(var_to_phi);
         }
     }
 
@@ -1459,7 +1459,7 @@ mod tests {
         let input = String::from(
             "main
         var a; {
-            let a <- -1;
+            let a <- 1;
     }.",
         );
         let mut parse = Parser::new(input);
@@ -2169,7 +2169,7 @@ var a, b, c, d;
         parse.visualize_ir();
     }
 
-     #[test]
+    #[test]
     fn github_test() {
         let input = String::from(
             "main
@@ -2314,7 +2314,7 @@ let zoink67 <- 67;
     }
     // bug for CSE let b <- a + 1; & let b <- a + 1;
     // timing of adding inst storage: should be after phi functions
-        #[test]
+    #[test]
     fn test2() {
         let input = String::from(
             "main
@@ -2342,7 +2342,7 @@ var a, b, c; {
         parse.visualize_ir();
     }
 
-       #[test]
+    #[test]
     fn test3_from_video() {
         let input = String::from(
             "main
