@@ -30,6 +30,23 @@ impl InstStorage {
         }
     }
 
+    pub fn adds_expression(&mut self, new_op: Operator, inst_num: i32) {
+        self.add_adds(new_op.clone(), inst_num);
+        self.add_subs(new_op, inst_num);
+    }
+
+    pub fn adds_term(&mut self, new_op: Operator, inst_num: i32) {
+        self.add_muls(new_op.clone(), inst_num);
+        self.add_divs(new_op, inst_num);
+    }
+
+    pub fn adds(&mut self, new_op: Operator, inst_num: i32) {
+        self.add_adds(new_op.clone(), inst_num);
+        self.add_subs(new_op.clone(), inst_num);
+        self.add_muls(new_op.clone(), inst_num);
+        self.add_divs(new_op, inst_num);
+    }
+
     pub fn add_adds(&mut self, new_add: Operator, inst_num: i32) -> Option<i32> {
         let new_abs_add = match new_add {
             Operator::Add(x, y) => Operator::Add(x.abs(), y.abs()),

@@ -225,7 +225,8 @@ impl Parser {
                 _ => panic!("Error, Invalid Div or Mul"),
             };
 
-            return_val = self.add_inst_to_tail(op, (var1, var2));
+            return_val = self.add_inst_to_tail(op.clone(), (var1, var2));
+            self.inst_storage.adds_term(op, return_val);
             var1 = None;
             x = return_val;
         }
@@ -252,6 +253,7 @@ impl Parser {
                 _ => panic!("Error: Invalid ADD or SUB format"),
             };
             return_val = self.add_inst_to_tail(op.clone(), (var1, var2));
+            self.inst_storage.adds_expression(op, return_val);
             var1 = None;
             // self.inst_storage.add_adds(op.clone(), return_val);
             // self.inst_storage.add_subs(op, return_val);
@@ -2356,6 +2358,23 @@ var x, y, i, j; {
         let y <- j + 1;
         let i <- i + 1;
     od;
+}.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
+    fn no_space_test() {
+        let input = String::from(
+            "main
+var x, y,i,j; {
+    let i<-5;
+    let x <-1-2*4+3/4;
 }.",
         );
         let mut parse = Parser::new(input);
