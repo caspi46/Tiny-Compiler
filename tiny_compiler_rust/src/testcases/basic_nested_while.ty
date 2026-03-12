@@ -1,0 +1,18 @@
+main
+var x, y;
+{
+	let x <- call InputNum;
+    while x < 10 do
+        call OutputNum(x);
+
+        let y <- call InputNum;
+        while y < 10 do
+            call OutputNum(y);
+            let y <- y + 1;
+        od;
+        call OutputNum(y);
+
+        let x <- x + 1;
+    od;
+    call OutputNum(x);
+}.

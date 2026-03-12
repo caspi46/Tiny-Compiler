@@ -1,0 +1,12 @@
+main
+var x, y, z;
+{
+    let x <- call InputNum;
+    if x > 0 then
+        let y <- 10;
+    else
+        let y <- 10;
+    fi;
+    call OutputNum(y);
+    call OutputNum(z);
+}.

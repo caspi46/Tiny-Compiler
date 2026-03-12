@@ -1,0 +1,19 @@
+main
+var a, b; 
+
+function compute(); var c, d; {
+    return 10;
+};
+
+function sum(a, b); var c; {
+    return a + b;
+};
+
+{
+let a <- call compute + call compute;
+call OutputNum(a);
+
+let a <- call sum(call compute + call compute(), 10 + 10);
+call OutputNum(a);
+}
+.

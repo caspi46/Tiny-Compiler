@@ -1,0 +1,13 @@
+main
+var var1, var2;
+{
+let var1 <- call InputNum;
+let var2 <- var1;
+return var1;
+return var2;
+return var1;
+return var2;
+return var1;
+return var2;
+return var1;
+}
