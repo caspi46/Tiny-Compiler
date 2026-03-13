@@ -263,10 +263,13 @@ impl<'a> Block {
         self.insts = insts.clone();
     }
 
-    pub fn optimize_block(&mut self) -> HashMap<(i32, String), Option<i32>> {
+    pub fn optimize_block(&mut self) -> HashMap<(i32, String), i32> {
+        println!("\n\nCURRENT BLOCK NAME {}", self.block_name);
+        println!("CURRENT TABLE BEFORE OPTI: {:?}", self.table);
         let mut delete_insts = HashMap::new();
-        let mut table_collector = HashMap::new();
+        let mut table_collector: HashMap<(i32, String), i32> = HashMap::new();
         let mut insts: VecDeque<Inst> = VecDeque::new();
+        println!("CURRENT STORAGE: {:?}", self.inst_storage);
         for inst in self.insts.clone() {
             let check = inst.clone();
             let check_i = check.clone().get_inst_num();
@@ -335,28 +338,44 @@ impl<'a> Block {
                 && let Some(opt_i) = delete_insts.get(&inst)
             {
                 println!("VAR: {}, INST_NUM: {}", var, opt_i);
-                table_collector.insert((inst, var.clone()), Some(*opt_i));
+                table_collector.insert((inst, var.clone()), *opt_i);
                 self.table.insert(var, Some(*opt_i));
             }
         }
+        println!("\n\nNEW TABLE: {:?}", self.table);
         return table_collector;
     }
 
     // var_to_pairs: pairs => (old, new)
-    pub fn optimize_fully(&mut self, var_to_pairs: &HashMap<(i32, String), Option<i32>>) {
+    pub fn optimize_fully(&mut self, var_to_pairs: &HashMap<(i32, String), i32>) {
+        println!(
+            "\n\n\nblock_name: {}\tvar_to_pairs: {:?}",
+            self.block_name, var_to_pairs
+        );
         let mut opt_insts = VecDeque::new();
         for mut inst in self.insts.clone() {
             match inst.clone().get_op_two() {
                 (Some(x), Some(y)) => {
                     if let Some(var_name) = inst.clone().get_id1()
-                        && let Some(Some(opt_one)) = var_to_pairs.get(&(x, var_name))
+                        && let Some(opt_one) = var_to_pairs.get(&(x, var_name))
                     {
                         inst.update_op_inst1(*opt_one);
                     }
                     if let Some(var_name) = inst.clone().get_id2()
-                        && let Some(Some(opt_one)) = var_to_pairs.get(&(y, var_name))
+                        && let Some(opt_one) = var_to_pairs.get(&(y, var_name))
                     {
                         inst.update_op_inst2(*opt_one);
+                    }
+                    match inst.clone().get_operator() {
+                        Operator::Phi(x, y) => {
+                            if x == y
+                                && let Some(id) = inst.get_id1()
+                            {
+                                self.table.insert(id, Some(x));
+                                continue;
+                            }
+                        }
+                        _ => (),
                     }
                     opt_insts.push_back(inst.clone());
                     continue;
@@ -371,7 +390,7 @@ impl<'a> Block {
                         inst.clone().get_operator()
                     );
                     if let Some(var_name) = inst.clone().get_id1()
-                        && let Some(Some(opt_one)) = var_to_pairs.get(&(x, var_name))
+                        && let Some(opt_one) = var_to_pairs.get(&(x, var_name))
                     {
                         inst.update_op_inst1(*opt_one);
                     }
@@ -383,7 +402,7 @@ impl<'a> Block {
         self.insts = opt_insts;
         for (var, i) in self.table.clone() {
             if let Some(inst) = i
-                && let Some(Some(opt_i)) = var_to_pairs.get(&(inst, var.clone()))
+                && let Some(opt_i) = var_to_pairs.get(&(inst, var.clone()))
             {
                 println!("VAR: {}, INST_NUM: {}", var, opt_i);
                 self.table.insert(var, Some(*opt_i));

@@ -266,9 +266,7 @@ impl Parser {
     ///
     /// expression relOp expression
     fn relation(&mut self) -> i32 {
-        println!("Current Token in Relation: {}", self.current());
         let (lhs, lhs_var) = self.expression();
-        print!("Current Token after LHS in relation: {}", self.current());
         let rel_op = self.current().clone();
         let (rhs, rhs_var) = self.expression();
         let cmp = self.add_inst_to_tail(Operator::Cmp(lhs, rhs), (lhs_var, rhs_var));
@@ -591,7 +589,7 @@ impl Parser {
         }
         // update instruction based on phi
         self.update_by_phi(var_to_pairs, while_key);
-        self.update_tables_with_insts(var_to_phi, while_key);
+        self.update_tables_with_insts(var_to_phi.clone(), while_key);
         // add phi functions on while block
         for inst in phi_insts {
             let cur_block = if let Some(b) = self.blocks.get(&self.cur_block_num) {
@@ -604,7 +602,7 @@ impl Parser {
 
         // od block
         let od_key = self.create_new_block("od".to_string(), self.get_table_from_block(while_key));
-
+        self.update_tables_with_insts(var_to_phi, od_key);
         self.connect(while_key, od_key);
         self.set_dom(while_key, od_key);
 
@@ -1196,10 +1194,8 @@ impl Parser {
     /// start_key: usize
     ///
     /// update table based on the phi function info
-    fn update_tables_with_insts(&mut self, var_to_phi: HashMap<String, i32>, start_key: usize) {
-        for i in start_key..self.total_block + 1 {
-            self.update_table_with_phi(&var_to_phi, i);
-        }
+    fn update_tables_with_insts(&mut self, var_to_phi: HashMap<String, i32>, key: usize) {
+        self.update_table_with_phi(&var_to_phi, key);
     }
 
     fn update_table_with_phi(&mut self, var_to_phi: &HashMap<String, i32>, key: usize) {
@@ -1598,8 +1594,8 @@ fi
         let input = String::from(
             "main
         var a, b; {
-        let a <- 2;
             if 1 == 0 then
+                let b <- 2;
             else let a <- b + 1;
             
 
@@ -2424,6 +2420,34 @@ var x, y, i, j; {
     }
 
     #[test]
+    fn cse_test1() {
+        let input = String::from(
+            "main
+var x, y; {
+   let x <- 1 * 2;
+    while x < 10 do
+        let x <- 1 / 2; 
+        while y > 10 do 
+            let y <- x / 2; 
+        od;
+        if x > 2 then
+            let x <- 1 / 2; 
+        else 
+            let y <- x / 2; 
+        fi; 
+    od;
+    let y <- 1 * 2;
+}.",
+        );
+        let mut parse = Parser::new(input);
+        parse.computation();
+        parse.show_vars();
+        parse.show_insts();
+        parse.show_blocks();
+        parse.visualize_ir();
+    }
+
+    #[test]
     fn no_space_test() {
         let input = String::from(
             "main
@@ -2444,46 +2468,32 @@ var x, y,i,j; {
     fn test_from_testcases() {
         let input = String::from(
             "
-
-
 main
-var zoink67, legalegends;
-
+var var1, var2, var3, var4, var5;
 {
-let zoink67 <- 1;
-let legalegends <- 2;
+let var1 <- call InputNum;
+let var2 <- call InputNum;
+let var3 <- call InputNum;
+let var4 <- call InputNum;
+let var5 <- call InputNum;
 
-if 1 < 2 then
-    let zoink67 <- 1 + 2;
-    if 10 < 20 then
-        let zoink67 <- 10 + 20;
-        if 100 < 200 then
-            let zoink67 <- 100 + 200;
-            if 1000 < 2000 then
-                let zoink67 <- 1000 + 2000;
-                if 10000 < 20000 then
-                    let zoink67 <- 10000 + 20000;
-                else
-                    let zoink67 <- 20000 + 10000;
-                fi;
-            else
-                let zoink67 <- 2000 + 1000;
-            fi;
-        else
-            let zoink67 <- 200 + 100;
-        fi;
+let var3 <- var4 + var5;
+
+while var1 == 2 do
+    if var1 == 3 then
+       let var1 <- var1 + 1;
     else
-        let zoink67 <- 20 + 10;
+       let var1 <- var1 + 2;
     fi;
+od;
+if var1 == 3 then
+   let var1 <- var1 + 1;
 else
-    let zoink67 <- 2 + 1;
+   let var1 <- var1 + 2;
 fi;
-
-let zoink67 <- 0 + 0;
-
-}
-.
-
+let var1 <- var4 + var5;
+return var1;
+}.
 
 ",
         );
