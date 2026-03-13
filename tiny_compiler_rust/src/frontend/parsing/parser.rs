@@ -1801,14 +1801,17 @@ fi;
         parse.visualize_ir();
     }
     #[test]
-    fn if_while_test() {
+    fn if_while_if_test() {
         let input = String::from(
             "main
         var a; {
         let a <- 1;
         if 1 == 2 then
             while 1 == a do
-                let a <- a - 1;
+                let a <-  a + 1; 
+                if a > 2 then 
+                    let a <- a - 1;
+                fi;
             od;
         fi;
     }.",
@@ -2225,34 +2228,35 @@ var a, b, c, d;
     #[test]
     fn github_test() {
         let input = String::from(
-            "main
-var a, b, c, d;
-{
-    let a <- call InputNum();
-    let b <- 0;
-    let c <- 1;
-    let d <- 0;
-    while a > 0 do
-        if a < 10 then
-            let b <- b + c;
-            let c <- c + 1;
-            while d < 3 do
-                let b <- b + a;
-                let d <- d + 1;
-            od;
-            let a <- a - 1;
-        else
-            let c <- c * 2;
-            let d <- 0;
-        fi;
-        let a <- a - 1;
-    od;
+            "
+main
+var a, b; 
+
+void function compute(a, b); var c, d; {
+    let c <- a;
+    let d <- b;
     call OutputNum(a);
     call OutputNum(b);
-    call OutputNum(c);
-    call OutputNum(d);
-    call OutputNewLine();
-}.",
+    if a + b == c + d then
+        call OutputNum(a + b + c + d);
+    else
+        call OutputNum(a + b - c - d);
+    fi;
+    return;
+};
+
+function sum(a, b); var c; {
+    let c <- a + b;
+    return c;
+};
+
+{
+let a <- 1;
+let b <- call sum(a, a);
+call OutputNum(b);
+}
+.
+",
         );
         let mut parse = Parser::new(input);
         parse.computation();
@@ -2440,34 +2444,46 @@ var x, y,i,j; {
     fn test_from_testcases() {
         let input = String::from(
             "
+
+
 main
-var a, b, c, d;
+var zoink67, legalegends;
+
 {
-    let a <- call InputNum();
-    let b <- 0;
-    let c <- 1;
-    let d <- 0;
-    while a > 0 do
-        if a < 10 then
-            let b <- b + c;
-            let c <- c + 1;
-            while d < 3 do
-                let b <- b + a;
-                let d <- d + 1;
-            od;
-            let a <- a - 1;
+let zoink67 <- 1;
+let legalegends <- 2;
+
+if 1 < 2 then
+    let zoink67 <- 1 + 2;
+    if 10 < 20 then
+        let zoink67 <- 10 + 20;
+        if 100 < 200 then
+            let zoink67 <- 100 + 200;
+            if 1000 < 2000 then
+                let zoink67 <- 1000 + 2000;
+                if 10000 < 20000 then
+                    let zoink67 <- 10000 + 20000;
+                else
+                    let zoink67 <- 20000 + 10000;
+                fi;
+            else
+                let zoink67 <- 2000 + 1000;
+            fi;
         else
-            let c <- c * 2;
-            let d <- 0;
+            let zoink67 <- 200 + 100;
         fi;
-        let a <- a - 1;
-    od;
-    call OutputNum(a);
-    call OutputNum(b);
-    call OutputNum(c);
-    call OutputNum(d);
-    call OutputNewLine();
-}.
+    else
+        let zoink67 <- 20 + 10;
+    fi;
+else
+    let zoink67 <- 2 + 1;
+fi;
+
+let zoink67 <- 0 + 0;
+
+}
+.
+
 
 ",
         );
