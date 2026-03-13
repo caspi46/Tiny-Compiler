@@ -1146,11 +1146,13 @@ impl Parser {
                         phis.insert(var, new_insts);
                     } else {
                         let pre_table = pre_b.borrow().get_table();
-                        if let Some(Some(x)) = pre_table.get(&var)
-                            && *x != y
-                        {
-                            let new_insts = (*x, y);
-                            phis.insert(var, new_insts);
+                        if let Some(Some(x)) = pre_table.get(&var) {
+                            if *x != y {
+                                let new_insts = (*x, y);
+                                phis.insert(var, new_insts);
+                            }
+                        } else {
+                            phis.insert(var, (0, y));
                         }
                     }
                 }
@@ -1577,7 +1579,7 @@ mod tests {
             "main
         var a, b; {
 
-            if 1 == 0 then
+            if 1 == 0 then else
                 let b <- 2;
 
 fi
@@ -2133,6 +2135,8 @@ fi;
     let e <- 3;
     if a > b then
         let a <- call sum(a, b, e);
+    else 
+        let e <- b + 1;
     fi;
     }
     .",
@@ -2436,30 +2440,34 @@ var x, y,i,j; {
     fn test_from_testcases() {
         let input = String::from(
             "
-
-
 main
-var a, b; 
-
-void function compute(a, b); var c, d; {
-    let c <- a;
-    let d <- b;
+var a, b, c, d;
+{
+    let a <- call InputNum();
+    let b <- 0;
+    let c <- 1;
+    let d <- 0;
+    while a > 0 do
+        if a < 10 then
+            let b <- b + c;
+            let c <- c + 1;
+            while d < 3 do
+                let b <- b + a;
+                let d <- d + 1;
+            od;
+            let a <- a - 1;
+        else
+            let c <- c * 2;
+            let d <- 0;
+        fi;
+        let a <- a - 1;
+    od;
     call OutputNum(a);
     call OutputNum(b);
-    if a + b == c + d then
-        call OutputNum(a + b + c + d);
-    else
-        call OutputNum(a + b - c - d);
-    fi;
-    return;
-};
-{
-let a <- 1;
-call OutputNum(b);
-}
-.
-
-
+    call OutputNum(c);
+    call OutputNum(d);
+    call OutputNewLine();
+}.
 
 ",
         );
