@@ -2336,27 +2336,34 @@ call OutputNum(b);
     #[test]
     fn github_test1() {
         let input = String::from(
-            "main
-var zoink67, legalegends;
-
+            "
+           main
+var var1, var2, var3, var4, var5;
 {
-let zoink67 <- 1;
-let legalegends <- 2;
+let var1 <- call InputNum;
+let var2 <- call InputNum;
+let var3 <- call InputNum;
+let var4 <- call InputNum;
+let var5 <- call InputNum;
 
-if 1 < 2 then
-    let zoink67 <- 1 + 1 + 1 + 1;
+let var3 <- var4 + var5;
+
+while var1 == 2 do
+    if var1 == 3 then
+       let var1 <- var1 + 1
+    else
+       let var1 <- var1 + 2;
+    fi;
+od;
+if var1 == 3 then
+   let var1 <- var1 + 1
 else
-    let zoink67 <- 67 + 67;
+   let var1 <- var1 + 2;
 fi;
-
-if 1 == 2 then
-    let zoink67 <- 1 - 1;
-fi;
-
-let zoink67 <- 67;
-
-}
-.",
+let var1 <- var4 + var5;
+return var1;
+}.
+",
         );
         let mut parse = Parser::new(input);
         parse.computation();
@@ -2431,7 +2438,7 @@ var x, y; {
             let y <- x / 2; 
         od;
         if x > 2 then
-            let x <- 1 / 2; 
+            let y <- 1;
         else 
             let y <- x / 2; 
         fi; 
@@ -2450,8 +2457,11 @@ var x, y; {
     #[test]
     fn no_space_test() {
         let input = String::from(
-            "main
-var x, y,i,j; {
+            "
+            
+            
+            main
+var x,y,i,j;{
     let i<-5;
     let x <-1-2*4+3/4;
 }.",
@@ -2467,34 +2477,31 @@ var x, y,i,j; {
     #[test]
     fn test_from_testcases() {
         let input = String::from(
-            "
-main
-var var1, var2, var3, var4, var5;
+            "main
+var zoink67, legalegends;
+
 {
-let var1 <- call InputNum;
-let var2 <- call InputNum;
-let var3 <- call InputNum;
-let var4 <- call InputNum;
-let var5 <- call InputNum;
+let zoink67 <- 1;
+let legalegends <- 2;
 
-let var3 <- var4 + var5;
-
-while var1 == 2 do
-    if var1 == 3 then
-       let var1 <- var1 + 1;
+if 1 < 2 then
+    let zoink67 <- 1 + 1 + 1 + 1;
+    if 1 < 2 then
+        let zoink67 <- 0 + 0;
     else
-       let var1 <- var1 + 2;
+        let zoink67 <- 1 + 1;
     fi;
-od;
-if var1 == 3 then
-   let var1 <- var1 + 1;
 else
-   let var1 <- var1 + 2;
+    if 67 < 67 then
+        let zoink67 <- 2 + 2;
+    else
+        let zoink67 <- 3 + 3;
+    fi;
+    let zoink67 <- 5 + 5;
 fi;
-let var1 <- var4 + var5;
-return var1;
-}.
 
+}
+.
 ",
         );
         let mut parse = Parser::new(input);

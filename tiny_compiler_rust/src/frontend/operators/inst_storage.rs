@@ -10,6 +10,7 @@ pub struct InstStorage {
     subs: HashMap<Operator, i32>,
     muls: HashMap<Operator, i32>,
     divs: HashMap<Operator, i32>,
+    // cmps: HashMap<Operator, i32>,
     // all_insts: HashMap<Operator, i32>,
 }
 
@@ -20,6 +21,7 @@ impl InstStorage {
             subs: HashMap::new(),
             muls: HashMap::new(),
             divs: HashMap::new(),
+            // cmps: HashMap::new(),
             // all_insts: HashMap::new(),
         }
     }
@@ -28,7 +30,8 @@ impl InstStorage {
         self.add_adds(new_op.clone(), inst_num);
         self.add_subs(new_op.clone(), inst_num);
         self.add_muls(new_op.clone(), inst_num);
-        self.add_divs(new_op, inst_num);
+        self.add_divs(new_op.clone(), inst_num);
+        // self.add_cmps(new_op, inst_num);
     }
 
     pub fn add_adds(&mut self, new_add: Operator, inst_num: i32) -> Option<i32> {
@@ -118,6 +121,23 @@ impl InstStorage {
         }
     }
 
+    // pub fn add_cmps(&mut self, new_cmp: Operator, inst_num: i32) -> Option<i32> {
+    //     let new_abs_cmp = match new_cmp {
+    //         Operator::Cmp(x, y) => Operator::Cmp(x.abs(), y.abs()),
+    //         _ => {
+    //             return None;
+    //         }
+    //     };
+    //     if !self.cmps.contains_key(&new_abs_cmp) {
+    //         self.cmps.insert(new_abs_cmp.clone(), inst_num);
+    //         return Some(inst_num);
+    //     }
+    //     match self.cmps.get(&new_abs_cmp) {
+    //         Some(&i) => Some(i),
+    //         _ => panic!("Error: Failed to add new sub operator in storage"),
+    //     }
+    // }
+
     pub fn get_inst_num(&self, op: &Operator) -> Option<i32> {
         match self.adds.get(op) {
             Some(i) => {
@@ -143,6 +163,7 @@ impl InstStorage {
             }
             _ => (),
         }
+
         None
     }
 }
