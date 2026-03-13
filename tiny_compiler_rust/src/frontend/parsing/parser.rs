@@ -384,23 +384,23 @@ impl Parser {
                 };
 
                 let func_call = Operator::Jsr(func.to_string());
+                let mut args = Vec::new(); 
                 self.move_token();
                 if &Token::Symbol(Symbol::OpenParen) == self.current() {
                     if params >= 1 {
                         let (param1, param1_var) = self.expression();
                         let set_param1 = Operator::SetPar1(param1);
-                        let inst_num =
-                            self.add_inst_to_tail(set_param1.clone(), (param1_var, None));
-                        self.insts.insert(set_param1, inst_num);
+                        // let inst_num =
+                        //     self.add_inst_to_tail(set_param1.clone(), (param1_var, None));
+                        // self.insts.insert(set_param1, inst_num);
+                        args.push((set_param1, param1_var));
                     }
 
                     if self.current() == &Token::Symbol(Symbol::Comma) {
                         if params >= 2 {
                             let (param2, param2_var) = self.expression();
                             let set_param2 = Operator::SetPar2(param2);
-                            let inst_num =
-                                self.add_inst_to_tail(set_param2.clone(), (param2_var, None));
-                            self.insts.insert(set_param2, inst_num);
+                            args.push((set_param2, param2_var));
                         } else {
                             panic!("Error: Parameter # mismatching");
                         }
@@ -409,9 +409,8 @@ impl Parser {
                         if params == 3 {
                             let (param3, param3_var) = self.expression();
                             let set_param3 = Operator::SetPar3(param3);
-                            let inst_num =
-                                self.add_inst_to_tail(set_param3.clone(), (param3_var, None));
-                            self.insts.insert(set_param3, inst_num);
+            
+                            args.push((set_param3, param3_var));
                         } else {
                             panic!("Error: Parameter # mismatching");
                         }
@@ -420,6 +419,11 @@ impl Parser {
                         self.move_token();
                     } else if params > 3 {
                         panic!("Error: Parameters are more than 3. 3 is the max");
+                    }
+                    for (arg, state) in args {
+                        let inst_num =
+                                self.add_inst_to_tail(arg.clone(), (state, None));
+                            self.insts.insert(arg, inst_num);
                     }
                     if &Token::Symbol(Symbol::CloseParen) != self.current() {
                         panic!(
@@ -2478,30 +2482,21 @@ var x,y,i,j;{
     fn test_from_testcases() {
         let input = String::from(
             "main
-var zoink67, legalegends;
+var x, y;
+
+function add(a, b);
+var r;
+{
+    let r <- a + b;
+    return r;
+};
 
 {
-let zoink67 <- 1;
-let legalegends <- 2;
+    let x <- 3;
+    let y <- call add(call add(x, 1), call add(3, 4));
+    let x <- y + 1;
+}.
 
-if 1 < 2 then
-    let zoink67 <- 1 + 1 + 1 + 1;
-    if 1 < 2 then
-        let zoink67 <- 0 + 0;
-    else
-        let zoink67 <- 1 + 1;
-    fi;
-else
-    if 67 < 67 then
-        let zoink67 <- 2 + 2;
-    else
-        let zoink67 <- 3 + 3;
-    fi;
-    let zoink67 <- 5 + 5;
-fi;
-
-}
-.
 ",
         );
         let mut parse = Parser::new(input);
