@@ -30,6 +30,7 @@ pub struct Block {
     inst_storage: InstStorage,
     nexts: Vec<usize>,
     doms: Vec<usize>,
+    opt_table: HashMap<(i32, String), i32>,
 }
 
 impl<'a> Block {
@@ -45,6 +46,7 @@ impl<'a> Block {
             nexts: Vec::new(),
             inst_storage: InstStorage::new(),
             doms: Vec::new(),
+            opt_table: HashMap::new(),
         }
     }
 
@@ -64,6 +66,10 @@ impl<'a> Block {
 
     pub fn add_dom(&mut self, block_num: usize) {
         self.doms.push(block_num);
+    }
+
+    pub fn get_opt_table(&self) -> HashMap<(i32, String), i32> {
+        self.opt_table.clone()
     }
 
     pub fn get_inst_num_index(&self, inst_num: i32) -> Option<usize> {
@@ -263,11 +269,10 @@ impl<'a> Block {
         self.insts = insts.clone();
     }
 
-    pub fn optimize_block(&mut self) -> HashMap<(i32, String), i32> {
+    pub fn optimize_block(&mut self) {
         println!("\n\nCURRENT BLOCK NAME {}", self.block_name);
         println!("CURRENT TABLE BEFORE OPTI: {:?}", self.table);
         let mut delete_insts = HashMap::new();
-        let mut table_collector: HashMap<(i32, String), i32> = HashMap::new();
         let mut insts: VecDeque<Inst> = VecDeque::new();
         println!("CURRENT STORAGE: {:?}", self.inst_storage);
         for inst in self.insts.clone() {
@@ -338,12 +343,11 @@ impl<'a> Block {
                 && let Some(opt_i) = delete_insts.get(&inst)
             {
                 println!("VAR: {}, INST_NUM: {}", var, opt_i);
-                table_collector.insert((inst, var.clone()), *opt_i);
+                self.opt_table.insert((inst, var.clone()), *opt_i);
                 self.table.insert(var, Some(*opt_i));
             }
         }
-        println!("\n\nNEW TABLE: {:?}", self.table);
-        return table_collector;
+        println!("\n\nNEW TABLE: {:?}", self.table);;
     }
 
     // var_to_pairs: pairs => (old, new)
@@ -405,7 +409,8 @@ impl<'a> Block {
                 && let Some(opt_i) = var_to_pairs.get(&(inst, var.clone()))
             {
                 println!("VAR: {}, INST_NUM: {}", var, opt_i);
-                self.table.insert(var, Some(*opt_i));
+                self.table.insert(var.clone(), Some(*opt_i));
+                self.opt_table.insert((inst, var), *opt_i);
             }
         }
     }

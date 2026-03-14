@@ -752,17 +752,17 @@ impl Parser {
             println!("Going to Func Body");
             self.move_token();
             self.func_body();
-            if is_void != self.is_void(self.cur_block_num) {
-                panic!(
-                    "Error: not matching the function type and return type: {}",
-                    self.current()
-                );
-            }
+            // if is_void != self.is_void(self.cur_block_num) {
+            //     panic!(
+            //         "Error: not matching the function type and return type: {}",
+            //         self.current()
+            //     );
+            // }
         } else {
             panic!("Error: Missing Semicolon for formal param");
         }
         if self.current() != &Token::Symbol(Symbol::SemiColon) {
-            panic!("Error: Missing Semicolon for func body");
+            panic!("Error: Missing Semicolon for func body: {}", self.current());
         }
 
         // void check
@@ -852,8 +852,13 @@ impl Parser {
     /// [varDecl] "{" [statSequence] "}"
     fn func_body(&mut self) {
         // variable for the user-defined function
-        self.var_decl();
-        self.move_token();
+        
+        if self.current() != &Token::Symbol(Symbol::OpenBrace) {
+            self.var_decl();
+            self.move_token();
+        }
+
+        println!("\n\nFUNC BODY: {}", self.current());
 
         // function logic
         if self.current() == &Token::Symbol(Symbol::OpenBrace) {
@@ -1278,24 +1283,24 @@ impl Parser {
     }
 
     fn optimize(&mut self) {
-        let mut table_collector = HashMap::new();
         for i in 0..self.total_block + 1 {
             if !self.block0s.contains(&i)
                 && let Some(bb) = self.blocks.get(&i)
             {
-                table_collector.insert(i, bb.borrow_mut().optimize_block());
+                bb.borrow_mut().optimize_block();
             }
         }
         for i in 0..self.total_block + 1 {
             if !self.block0s.contains(&i)
-                && let Some(t) = table_collector.get(&i)
                 && let Some(bb) = self.blocks.get(&i)
             {
-                println!("OPTIMIZE FULLY: {:?}", t);
+                let opt_table = bb.borrow().get_opt_table();
                 for next in bb.borrow().get_nexts() {
                     if let Some(next_bb) = self.blocks.get(next) {
-                        next_bb.borrow_mut().optimize_fully(t);
+                        next_bb.borrow_mut().optimize_fully(&opt_table);
+                        
                     }
+                    
                 }
             }
         }
@@ -1942,7 +1947,7 @@ fi;
 
     function sum(); var c; {
         let c <- a;
-        return c;
+        return a + d;
     };
 
     {
@@ -2040,9 +2045,7 @@ fi;
     var b, e;
 
     function sum(a, b, d); var c; {
-        let c <- a + d;
-        let a <- a + d; 
-        return c;
+        return a + d;
     };
 
     {
@@ -2126,7 +2129,7 @@ fi;
             "main
     var a, b, e;
 
-    function sum(a, b, d); var c; {
+    function sum(a, b, d); {
         let c <- a + d;
         let a <- a + d; 
         return c;
@@ -2310,7 +2313,7 @@ call OutputNum(b);
 
     function sum(a, b, d); var c; {
         let c <- a + d;
-        return c;
+        return a + d;
     };
 
     void function sum2(a, b); var d; {
@@ -2482,22 +2485,28 @@ var x,y,i,j;{
     fn test_from_testcases() {
         let input = String::from(
             "main
-var x, y;
+var x, y, z;
 
-function add(a, b);
-var r;
+function adder(a, b);
 {
-    let r <- a + b;
-    return r;
+    return b + a;
 };
 
 {
-    let x <- 3;
-    let y <- call add(call add(x, 1), call add(3, 4));
-    let x <- y + 1;
-}.
+    let x <- call InputNum;
+    let y <- x;
+    let z <- 0;
 
-",
+    if z < 10 then
+        let y <- call adder(x, z);
+        if y < 10 then
+            let y <- call adder(y, y);
+        else
+            let z <- z * 2;
+		fi;
+		let x <- x + 5;
+    fi;
+}.",
         );
         let mut parse = Parser::new(input);
         parse.computation();
