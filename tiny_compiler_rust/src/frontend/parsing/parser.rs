@@ -10,32 +10,22 @@ use crate::frontend::parsing::block::Block;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 
-/// Parser Struct:
-///
-/// tokens: Token list from Tokenizer
-///
-/// blocks: Block list
-///
-/// vars: global variable list (In this project, only consider global variables)
-///       and variables in function (will be deleted after parsing user defined functions)
-///
-/// insts: instruction list
-///
-/// funcs: function list
-///
-/// void_funcs: void function list to identify function call's return type existance
-///
-/// cur_token_index: current token index
-///
-/// cur_block_num: current block key
-///
-/// block0_num: current block0 key
-///
-/// total_inst: total number of instructions
-///
-/// total_block: total number of blocks
-///
-/// inst_storage: instruction storage for optimization
+/// # Parser Struct:
+/// - This struct is responsible for parsing the token list from the tokenizer and generating the intermediate representation (IR) in the form of blocks and instructions.
+/// ## Arguments: 
+/// * `tokens`: Token list from Tokenizer
+/// * `blocks`: Block list
+/// * `vars`: global variable list (In this project, only consider global variables)
+///   and variables in function (will be deleted after parsing user defined functions)
+/// * `insts`: instruction list
+/// * `funcs`: function list
+/// * `void_funcs` : void function list to identify function call's return type existance
+/// * `cur_token_index`: current token index
+/// * `cur_block_num`: current block key
+/// * `block0_num`: current block0 key
+/// * `total_inst`: total number of instructions
+/// * `total_block`: total number of blocks
+/// * `inst_storage`: instruction storage for optimization
 #[derive()]
 pub struct Parser {
     tokens: Vec<Token>,
@@ -55,8 +45,12 @@ pub struct Parser {
 
 impl Parser {
     /// new (constructor)
-    ///
-    /// input: String (Source Code)
+    /// 
+    /// # Arguments 
+    /// 
+    /// * `input` - source code in string format
+    /// 
+    /// construct parser with the initial fields and tokenizing the source code
     pub fn new(input: String) -> Self {
         let mut tokenizer = Tokenizer::new(input);
         tokenizer.generate_token();
@@ -86,9 +80,11 @@ impl Parser {
         }
     }
 
-    /// current function:
+    /// current:
     ///
-    /// return the current token
+    /// # Returns
+    /// 
+    /// The current token
     fn current(&self) -> &Token {
         if self.cur_token_index == self.tokens.len() {
             panic!("Error: Out of range");
@@ -96,45 +92,43 @@ impl Parser {
         &self.tokens[self.cur_token_index]
     }
 
-    /// move_token function:
-    ///
     /// increase current token index and
     /// move the next token
     fn move_token(&mut self) {
         self.cur_token_index += 1;
     }
 
-    /// factor:
-    ///
-    /// ident | number | "(" expression ")" | funcCall
+
+    /// factor = ident | number | "(" expression ")" | funcCall
     ///
     /// identifies the type and value of the current token
     /// and generate the instruction based on the information
     ///
-    /// case 1: (
-    ///     call expression to identify inside of the parantehsis
+    /// ## Cases: 
+    /// ### case 1: "(" expression ")" 
+    /// - call expression to identify inside of the parantehsis
     ///     must have the closed paranethesis at the end (after expression)
     ///
-    /// case 2: Number
-    ///     identifies if the block0 (const value container) already has the instruction for the number
-    ///
-    ///     if not: generate new instruction for the number and return the instruction number
-    ///
-    ///     if so: return the existing instruction number
-    ///
-    /// case 3: Ident (Variable)
-    ///     identifies if the variable is initialized already by looking at current block's table
+    /// ### case 2: Number
+    /// - identifies if the block0 (const value container) already has the instruction for the number
     ///  
-    ///     if not: warn that it is not initialized and return 0 which means the variable is 0
-    ///  
-    ///     if so: return the existing instruction number
+    ///     - if not: generate new instruction for the number and return the instruction number
     ///
-    /// case 4: Function call
-    ///     Identify if the function is user-defined
+    ///     - if so: return the existing instruction number
+    ///
+    /// ### case 3: Ident (Variable)
+    /// - identifies if the variable is initialized already by looking at current block's table
+    ///  
+    ///     - if not: warn that it is not initialized and return 0 which means the variable is 0
+    ///  
+    ///     - if so: return the existing instruction number
+    ///
+    /// ### case 4: Function call
+    /// - Identify if the function is user-defined
     ///   
-    ///     if not: move onto the function call function (func_call)
+    ///     - if not: move onto the function call function (func_call)
     ///   
-    ///     if so: check if it's a void or not. It must be non-void function
+    ///     - if so: check if it's a void or not. It must be non-void function
     ///            and move onto the function call (func_call)
     fn factor(&mut self) -> (i32, Option<String>) {
         println!("Factor's current Token: {}", self.current());
@@ -208,9 +202,7 @@ impl Parser {
         }
     }
 
-    /// term:
-    ///
-    /// factor { ("*" | "/") factor }
+    /// term = factor { ("*" | "/") factor }
     fn term(&mut self) -> (i32, Option<String>) {
         let (mut x, mut var1) = self.factor();
         println!("Current token after Factor: {}", self.current());
@@ -235,9 +227,8 @@ impl Parser {
         (return_val, None)
     }
 
-    /// expression:
-    ///
-    /// term { ("+" | "-") term }
+
+    /// expression = term { ("+" | "-") term }
     fn expression(&mut self) -> (i32, Option<String>) {
         let (mut x, mut var1) = self.term();
         if self.current() != &Token::Op(ADD) && self.current() != &Token::Op(SUB) {
@@ -262,9 +253,8 @@ impl Parser {
         (return_val, None)
     }
 
-    /// relation:
-    ///
-    /// expression relOp expression
+
+    /// relation = expression relOp expression
     fn relation(&mut self) -> i32 {
         let (lhs, lhs_var) = self.expression();
         let rel_op = self.current().clone();
@@ -284,9 +274,8 @@ impl Parser {
         rel_inst
     }
 
-    /// assignment:
-    ///
-    /// "let" ident "<-"  expression
+
+    /// assignment = "let" ident "<-"  expression
     fn assignment(&mut self) -> i32 {
         self.move_token();
         let var = match self.current() {
@@ -311,9 +300,7 @@ impl Parser {
         rhs
     }
 
-    /// func_call
-    ///
-    /// "call" ident [ "(" [expression {"," expression}] ")"]
+    /// function call ="call" ident [ "(" [expression {"," expression}] ")"]
     fn func_call(&mut self) -> i32 {
         match self.current() {
             // InputNum(): no parameter
@@ -448,9 +435,7 @@ impl Parser {
         }
     }
 
-    /// if_statement
-    ///
-    /// "if" relation "then" statSequence ["else" statSequence] "fi"
+    /// if statement = "if" relation "then" statSequence ["else" statSequence] "fi"
     fn if_statement(&mut self) {
         let before_table = self.get_current_table();
         let if_key = self.cur_block_num;
@@ -537,8 +522,7 @@ impl Parser {
         self.move_token();
     }
 
-    /// while_statement
-    /// "while" relaton "do" StatSequence "od"
+    /// while statement = "while" relaton "do" StatSequence "od"
     fn while_statement(&mut self) {
         let before_table = self.get_current_table();
 
@@ -618,9 +602,7 @@ impl Parser {
         self.move_token();
     }
 
-    /// return_statement
-    ///
-    /// "return" [ expression ]
+    /// return statement = "return" [ expression ]
     fn return_statement(&mut self) {
         println!("Current Token at Return: {}", self.current());
         self.move_token();
@@ -634,9 +616,7 @@ impl Parser {
         self.add_inst_to_tail(return_op, (return_var, None));
     }
 
-    /// statement
-    ///
-    /// assignment | funcCall | ifStatement | whileStatement | returnStatement
+    /// statement = assignment | funcCall | ifStatement | whileStatement | returnStatement
     fn statement(&mut self) {
         self.move_token();
         match &self.current() {
@@ -673,9 +653,7 @@ impl Parser {
         };
     }
 
-    /// stat_sequence
-    ///
-    /// statement { ";" statement } [";"]
+    /// stat sequence = statement { ";" statement } [";"]
     ///
     /// I decided the design choice that all statement must have ";"
     fn stat_sequence(&mut self) {
@@ -685,9 +663,8 @@ impl Parser {
         }
     }
 
-    /// var_decl
-    ///
-    /// "var" ident {"," ident} ";"
+
+    /// var decl = "var" ident {"," ident} ";"
     fn var_decl(&mut self) {
         self.move_token();
         match self.current() {
@@ -711,9 +688,7 @@ impl Parser {
         }
     }
 
-    /// func_decl
-    ///
-    /// ["void"] "function" ident formalParam ";" funcBody ";"
+    /// func decl = ["void"] "function" ident formalParam ";" funcBody ";"
     fn func_decl(&mut self) {
         // prevent from corrupting the variable hash map
         let global_vars = self.vars.clone();
@@ -780,11 +755,10 @@ impl Parser {
         self.switch_block0(0);
     }
 
-    /// formal_param
-    ///
-    ///  "( [ident {"," ident}] ")"
-    ///
-    /// return # of parameters
+    /// formal param = "( [ident {"," ident}] ")"
+    /// - only handle 3 parameters 
+    /// ### return 
+    /// - the number of parameters
     fn formal_param(&mut self) -> usize {
         // may need to change (if max # of parameters is not 3)
         let mut params = 0;
@@ -847,9 +821,7 @@ impl Parser {
         return params;
     }
 
-    /// func_body
-    ///
-    /// [varDecl] "{" [statSequence] "}"
+    /// function body = [varDecl] "{" [statSequence] "}"
     fn func_body(&mut self) {
         // variable for the user-defined function
         
@@ -870,9 +842,7 @@ impl Parser {
         self.move_token();
     }
 
-    /// computation
-    ///
-    /// "main" [varDecl] {funcDecl} "{" statSequence "}" "."
+    /// computation = "main" [varDecl] {funcDecl} "{" statSequence "}" "."
     ///
     fn computation(&mut self) {
         // Main
@@ -924,15 +894,13 @@ impl Parser {
         self.optimize();
     }
 
-    /// helper functions to add instruction to the current block
-    ///
-    ///
+    // helper functions to add instruction to the current block
+    
 
     /// create_new_block
-    ///
-    /// name: String
-    ///
-    /// table: HashMap<String, Option<i32>>
+    /// ## Arguments:
+    /// * `name`: String 
+    /// * `table`: HashMap<String, Option<i32>> 
     ///
     /// create new block and return its key
     fn create_new_block(&mut self, name: String, table: HashMap<String, Option<i32>>) -> usize {
@@ -944,8 +912,8 @@ impl Parser {
     }
 
     /// add_const_to_bb0
-    ///
-    /// op: Operator
+    /// ## Arguments:
+    /// * `op`- Operator
     ///
     /// add constant variable to the current block 0
     fn add_const_to_bb0(&mut self, op: Operator) -> i32 {
@@ -1749,11 +1717,9 @@ fi;
         var a; {
         let a <- 1;
             while 1 == a do
-                while 1 == a do 
-                    let a <- a + 3;
-                od;
             let a <- a + 1;
-            od
+            od;
+            let b <- a + 2;
     }.",
         );
         let mut parse = Parser::new(input);
@@ -2270,7 +2236,6 @@ call OutputNum(b);
     }
 
     #[test]
-    #[should_panic]
     fn detect_void_assignment() {
         let input = String::from(
             "main

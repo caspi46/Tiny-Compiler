@@ -4,6 +4,8 @@ use std::collections::HashMap;
 // each vector contains the each Inst type instructions
 // Every time new inst is created, it is added into the storage.
 
+/// ## InstStorage 
+/// This struct is used to store the instruction and optimize the instruction
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstStorage {
     adds: HashMap<Operator, i32>,
@@ -11,10 +13,12 @@ pub struct InstStorage {
     muls: HashMap<Operator, i32>,
     divs: HashMap<Operator, i32>,
     // cmps: HashMap<Operator, i32>,
-    // all_insts: HashMap<Operator, i32>,
 }
 
 impl InstStorage {
+
+    /// ## new
+    /// This function creates a new instance of InstStorage with empty HashMaps for each instruction type.
     pub fn new() -> Self {
         Self {
             adds: HashMap::new(),
@@ -26,6 +30,12 @@ impl InstStorage {
         }
     }
 
+    /// ## adds
+    /// ### Arguments:
+    /// - `new_op`: The new operator to add.
+    /// - `inst_num`: The instruction number.
+    /// 
+    /// This function adds a new instruction to the storage. 
     pub fn adds(&mut self, new_op: Operator, inst_num: i32) {
         self.add_adds(new_op.clone(), inst_num);
         self.add_subs(new_op.clone(), inst_num);
@@ -34,6 +44,17 @@ impl InstStorage {
         // self.add_cmps(new_op, inst_num);
     }
 
+    /// ## add_adds 
+    /// ### Arguments:
+    /// - `new_add`: The new add operator to add.
+    /// - `inst_num`: The instruction number.
+    /// ### Returns:
+    /// - `Some(i32)`: The instruction number if the instruction already exists.
+    /// - `None`: If the instruction doesn't exist.
+    /// 
+    /// This function adds a new add instruction to the storage. 
+    /// It checks if the instruction already exists in the storage, if it does, it returns the instruction number. 
+    /// If it doesn't, it adds the instruction to the storage and returns the new instruction number.
     pub fn add_adds(&mut self, new_add: Operator, inst_num: i32) -> Option<i32> {
         let new_abs_add = match new_add {
             Operator::Add(x, y) => Operator::Add(x.abs(), y.abs()),
@@ -61,6 +82,7 @@ impl InstStorage {
         }
     }
 
+    /// ## add_subs
     pub fn add_subs(&mut self, new_sub: Operator, inst_num: i32) -> Option<i32> {
         let new_abs_sub = match new_sub {
             Operator::Sub(x, y) => Operator::Sub(x.abs(), y.abs()),
